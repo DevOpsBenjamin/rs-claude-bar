@@ -3,12 +3,14 @@ pub mod types;
 pub mod parser;
 pub mod status;
 pub mod utils;
+pub mod config;
 
 pub use colors::*;
 pub use types::*;
 pub use parser::*;
 pub use status::*;
 pub use utils::*;
+pub use config::*;
 
 pub fn generate_claude_status() -> Result<String, Box<dyn std::error::Error>> {
     status::generate_status()

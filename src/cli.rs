@@ -17,4 +17,7 @@ pub enum Commands {
     History,
     /// Display detailed statistics
     Stats,
+    /// Interactively reset display configuration
+    #[command(name = "display-config")]
+    DisplayConfig,
 }
