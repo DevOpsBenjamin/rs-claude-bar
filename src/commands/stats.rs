@@ -20,3 +20,13 @@ pub fn run() {
     let table = Table::new(data).to_string();
     println!("{}", table);
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn run_does_not_panic() {
+        run();
+    }
+}
