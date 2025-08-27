@@ -1,17 +1,15 @@
-use rs_claude_bar::{generate_claude_status, debug_output};
-use std::env;
+mod cli;
+mod commands;
+
+use clap::Parser;
+use cli::{Cli, Commands};
 
 fn main() {
-    let args: Vec<String> = env::args().collect();
-    
-    // Check for debug flag (Rust standard convention)
-    if args.len() > 1 && args[1] == "--debug" {
-        print!("{}", debug_output());
-        return;
-    }
-    
-    match generate_claude_status() {
-        Ok(status) => print!("{}", status),
-        Err(e) => print!("🤖 Claude Code | ❌ Error: {}", e),
+    let cli = Cli::parse();
+    match cli.command.unwrap_or(Commands::Status) {
+        Commands::Status => commands::status::run(),
+        Commands::Update => commands::update::run(),
+        Commands::History => commands::history::run(),
+        Commands::Stats => commands::stats::run(),
     }
 }
