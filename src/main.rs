@@ -11,5 +11,6 @@ fn main() {
         Commands::Update => commands::update::run(),
         Commands::History => commands::history::run(),
         Commands::Stats => commands::stats::run(),
+        Commands::DisplayConfig => commands::display_config::run(),
     }
 }
