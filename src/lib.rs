@@ -1,4 +1,5 @@
-pub mod claude_sdk;
+pub mod claude_types;
+pub mod claudebar_types;
 pub mod colors;
 pub mod config;
 pub mod parser;
@@ -6,7 +7,8 @@ pub mod status;
 pub mod types;
 pub mod utils;
 
-pub use claude_sdk::*;
+pub use claude_types::*;
+pub use claudebar_types::*;
 pub use colors::*;
 pub use config::*;
 pub use parser::*;
@@ -16,6 +18,20 @@ pub use utils::*;
 
 pub fn generate_claude_status() -> Result<String, Box<dyn std::error::Error>> {
     status::generate_status()
+}
+
+pub fn parse_claude_input() -> Option<claude_types::ClaudeCodeInput> {
+    use std::io::{self, Read};
+    
+    if !atty::is(atty::Stream::Stdin) {
+        let mut input = String::new();
+        if io::stdin().read_to_string(&mut input).is_ok() {
+            if let Ok(parsed) = serde_json::from_str::<claude_types::ClaudeCodeInput>(&input) {
+                return Some(parsed);
+            }
+        }
+    }
+    None
 }
 
 pub fn debug_output() -> String {
