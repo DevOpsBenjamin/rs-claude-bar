@@ -107,14 +107,17 @@ pub fn parse_jsonl_entry(line: &str) -> Result<UsageEntry, Box<dyn std::error::E
     })
 }
 
-/// Load all JSONL entries from Claude data directory
+/// Load all JSONL entries from Claude data directory  
 pub fn load_claude_data() -> Result<Vec<UsageEntry>, Box<dyn std::error::Error>> {
-    // Find Claude data directory
-    let home = env::var("HOME")?;
-    let claude_dir = Path::new(&home).join(".claude").join("projects");
+    load_claude_data_from_path("tests/small")
+}
+
+/// Load JSONL entries from specific path
+pub fn load_claude_data_from_path(data_path: &str) -> Result<Vec<UsageEntry>, Box<dyn std::error::Error>> {
+    let claude_dir = Path::new(data_path);
 
     if !claude_dir.exists() {
-        return Err("No Claude data found".into());
+        return Err(format!("Data path does not exist: {}", data_path).into());
     }
 
     // Parse JSONL files and collect usage data

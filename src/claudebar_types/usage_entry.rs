@@ -1,7 +1,6 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use std::path::Path;
-use crate::claude_types::{TranscriptEntry, MessageContent, MessageUsage};
+use crate::claude_types::{TranscriptEntry, MessageUsage};
 
 /// Simplified entry for Claude Bar usage tracking
 #[derive(Debug, Clone, Serialize, Deserialize)]

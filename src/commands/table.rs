@@ -2,7 +2,7 @@ use std::fs;
 use std::path::Path;
 use tabled::{Table, Tabled};
 use chrono::{DateTime, Utc};
-use rs_claude_bar::{claude_types::TranscriptEntry, claudebar_types::ClaudeBarUsageEntry};
+use rs_claude_bar::{claude_types::TranscriptEntry, claudebar_types::{ClaudeBarUsageEntry, group_by_project}};
 
 #[derive(Tabled)]
 struct UsageRow {
@@ -106,6 +106,9 @@ pub fn run(data_path: Option<&str>) {
     // Sort by timestamp
     usage_entries.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
     
+    // Project grouping statistics (before moving usage_entries)
+    let project_stats = group_by_project(&usage_entries);
+    
     // Convert to table rows
     let table_rows: Vec<UsageRow> = usage_entries
         .into_iter()
@@ -120,14 +123,17 @@ pub fn run(data_path: Option<&str>) {
             total_tokens: entry.usage.total_tokens,
             content_length: entry.content_length,
             limit_reached: if entry.is_limit_reached { "YES" } else { "NO" }.to_string(),
-            folder: entry.file_info.folder_name.split('-').last().unwrap_or("unknown").to_string(),
+            folder: entry.file_info.folder_name.clone(),
             file: entry.file_info.file_name[..8].to_string(), // Truncate for table
         })
         .collect();
     
+    // Get count before moving table_rows
+    let entry_count = table_rows.len();
+    
     // Display table
-    let table = Table::new(table_rows).to_string();
-    println!("\n📊 Claude Bar Usage Table ({} entries):", table_rows.len());
+    let table = Table::new(&table_rows).to_string();
+    println!("\n📊 Claude Bar Usage Table ({} entries):", entry_count);
     println!("{}", table);
     
     // Summary statistics
@@ -140,6 +146,24 @@ pub fn run(data_path: Option<&str>) {
     println!("  Total Tokens: {}", total_tokens);
     println!("  Limit Hits: {}", limit_hits);
     println!("  Unique Sessions: {}", unique_sessions.len());
+    
+    println!("\n📊 Project Statistics:");
+    for project in &project_stats {
+        println!("  Project: {}", project.project_name);
+        println!("    User     - Entries: {}, Tokens: {}, Content: {} chars", 
+                 project.user_stats.entry_count, 
+                 project.user_stats.total_tokens, 
+                 project.user_stats.total_content_length);
+        println!("    Assistant - Entries: {}, Tokens: {}, Content: {} chars", 
+                 project.assistant_stats.entry_count, 
+                 project.assistant_stats.total_tokens, 
+                 project.assistant_stats.total_content_length);
+        println!("    Total    - Entries: {}, Tokens: {}, Content: {} chars", 
+                 project.total_stats.entry_count, 
+                 project.total_stats.total_tokens, 
+                 project.total_stats.total_content_length);
+        println!();
+    }
 }
 
 #[cfg(test)]
