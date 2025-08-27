@@ -45,6 +45,12 @@ impl UsageEntry {
     }
 }
 
+impl Default for UsageEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl UsageWindow {
     pub fn new(start_time: DateTime<Utc>) -> Self {
         Self {

@@ -1,16 +1,18 @@
+pub mod claude_sdk;
 pub mod colors;
-pub mod types;
+pub mod config;
 pub mod parser;
 pub mod status;
+pub mod types;
 pub mod utils;
-pub mod config;
 
+pub use claude_sdk::*;
 pub use colors::*;
-pub use types::*;
+pub use config::*;
 pub use parser::*;
 pub use status::*;
+pub use types::*;
 pub use utils::*;
-pub use config::*;
 
 pub fn generate_claude_status() -> Result<String, Box<dyn std::error::Error>> {
     status::generate_status()
@@ -19,6 +21,7 @@ pub fn generate_claude_status() -> Result<String, Box<dyn std::error::Error>> {
 pub fn debug_output() -> String {
     use colors::*;
 
+    let sep = format!("{}|{}", GRAY, RESET);
     format!(
         "{}{}{} {}{}{} {} {}{} TEST{} {} {}{} TIME{} {} {}{} LEFT{} {} {}{} SONNET{}\n",
         BOLD,
@@ -27,19 +30,19 @@ pub fn debug_output() -> String {
         GRAY,
         "[use /context]",
         RESET,
-        format!("{}{}{}", GRAY, "|", RESET),
+        sep,
         BLUE,
         "💬",
         RESET,
-        format!("{}{}{}", GRAY, "|", RESET),
+        sep,
         PURPLE,
         "⏱️",
         RESET,
-        format!("{}{}{}", GRAY, "|", RESET),
+        sep,
         RED,
         "⏰",
         RESET,
-        format!("{}{}{}", GRAY, "|", RESET),
+        sep,
         CYAN,
         "🤖",
         RESET
