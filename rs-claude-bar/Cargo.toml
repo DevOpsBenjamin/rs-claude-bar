@@ -1,0 +1,23 @@
+[package]
+name = "rs-claude-bar"
+version = "0.1.0"
+edition = "2021"
+description = "Enhanced Claude Code usage tracker with 5-hour window monitoring"
+license = "MIT"
+repository = "https://github.com/DevOpsBenjamin/rs-claude-bar"
+keywords = ["claude", "ai", "usage", "cli", "monitoring"]
+categories = ["command-line-utilities"]
+
+[[bin]]
+name = "rs-claude-bar"
+path = "src/main.rs"
+
+[dependencies]
+serde_json = "1.0"
+chrono = { version = "0.4", features = ["serde"] }
+
+[profile.release]
+strip = true
+lto = true
+codegen-units = 1
+panic = "abort"
