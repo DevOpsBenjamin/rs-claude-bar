@@ -16,6 +16,9 @@ path = "src/main.rs"
 serde_json = "1.0"
 chrono = { version = "0.4", features = ["serde"] }
 atty = "0.2"
+clap = { version = "4", features = ["derive"] }
+tabled = "0.14"
+serde = { version = "1.0", features = ["derive"] }
 
 [profile.release]
 strip = true
