@@ -1,11 +1,13 @@
 use chrono::{DateTime, Duration, Utc};
 use regex::Regex;
-use rs_claude_bar::{claude_types::TranscriptEntry, claudebar_types::ClaudeBarUsageEntry};
+use rs_claude_bar::{claude_types::TranscriptEntry, claudebar_types::GuessBlock, claudebar_types::ClaudeBarUsageEntry};
+use std::collections::HashSet;
 use std::fs;
 use std::path::Path;
 
 // Read JSONL files, find only limit-reached entries, and print simple list lines:
 // "<end UTC> | <start UTC>" where start = end - 5h
+
 pub fn run(config: &rs_claude_bar::ConfigInfo) {
     let base_path = format!("{}/projects", config.claude_data_path);
     let path = Path::new(&base_path);
@@ -72,21 +74,47 @@ pub fn run(config: &rs_claude_bar::ConfigInfo) {
     // Sort by timestamp descending (most recent first)
     limit_entries.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
 
-    for e in limit_entries {
+    // Build blocks from entries
+    let mut blocks: Vec<GuessBlock> = Vec::new();
+    for e in limit_entries.into_iter() {
         let ts = e.timestamp;
         let content = e.content_text.as_deref().unwrap_or("");
         if let Some(reset_time) = parse_reset_time(content) {
             if let Some(unlock) = calculate_unlock_time(ts, &reset_time) {
                 let start = unlock - Duration::hours(5);
-                println!(
-                    "{}|{}|{}|{}",
-                    ts.format("%Y-%m-%d %H:%M UTC"),
-                    reset_time,
-                    unlock.format("%Y-%m-%d %H:%M UTC"),
-                    start.format("%Y-%m-%d %H:%M UTC"),
-                );
+                blocks.push(GuessBlock {
+                    msg_timestamp: ts,
+                    reset: reset_time,
+                    end: unlock,
+                    start,
+                });
             }
         }
+    }
+
+    // Deduplicate by timing (start,end) to remove retries before limit end
+    let mut seen: HashSet<(i64, i64)> = HashSet::new();
+    let mut unique: Vec<GuessBlock> = Vec::new();
+    for b in blocks.into_iter() {
+        let key = (b.start.timestamp(), b.end.timestamp());
+        if seen.insert(key) {
+            unique.push(b);
+        }
+    }
+
+    // Keep newest first by end time
+    unique.sort_by(|a, b| b.end.cmp(&a.end));
+
+    // Debug table (simple header + rows)
+    println!("timestamp|reset|end|start");
+    for b in unique.into_iter() {
+        println!(
+            "{}|{}|{}|{}",
+            b.msg_timestamp.format("%Y-%m-%d %H:%M UTC"),
+            b.reset,
+            b.end.format("%Y-%m-%d %H:%M UTC"),
+            b.start.format("%Y-%m-%d %H:%M UTC"),
+        );
     }
 }
 
