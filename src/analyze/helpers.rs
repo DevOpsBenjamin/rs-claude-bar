@@ -1,6 +1,7 @@
 use chrono::{DateTime, Utc};
+use chrono::TimeZone;
 use regex::Regex;
-use std::{fs, path::Path};
+use std::{fs, path::Path, collections::HashMap};
 
 use crate::{
     claude_types::TranscriptEntry,
@@ -205,7 +206,6 @@ pub fn build_current_blocks_from_guess(guess: &Vec<GuessBlock>, now: DateTime<Ut
 /// Aggregate events into blocks.
 /// Blocks vector must contain: first gap, blocks/gaps in order, last gap.
 pub fn aggregate_events_into_blocks(blocks: &mut Vec<CurrentBlock>, guess: &Vec<GuessBlock>, all: &Vec<ClaudeBarUsageEntry>) {
-    use crate::claudebar_types::UserRole;
     if guess.is_empty() {
         for e in all.iter() {
             update_block(blocks.get_mut(0).unwrap(), e);
@@ -213,22 +213,22 @@ pub fn aggregate_events_into_blocks(blocks: &mut Vec<CurrentBlock>, guess: &Vec<
         return;
     }
 
-    // Helper: find index of a block matching guess times
-    let find_block_index = |start: DateTime<Utc>, end: DateTime<Utc>| -> Option<usize> {
-        blocks.iter().position(|b| b.start == Some(start) && b.end == Some(end))
-    };
-
-    // Helper: find first gap index
-    let first_gap_index = 0usize;
-
-    // Helper: find the gap between two blocks (newer, older)
-    let find_middle_gap_index = |newer_idx: usize, older_idx: usize| -> Option<usize> {
-        if newer_idx + 1 >= older_idx { return None; }
-        blocks[newer_idx + 1..older_idx].iter().position(|b| b.start.is_none() && b.end.is_none()).map(|rel| newer_idx + 1 + rel)
-    };
-
-    // Helper: find last gap index
-    let last_gap_index = blocks.len() - 1;
+    // Precompute block indices by (start,end) timestamps and gap indices
+    let mut block_index_map: HashMap<(i64, i64), usize> = HashMap::new();
+    let mut first_gap_index: usize = 0;
+    let mut last_gap_index: usize = 0;
+    for (idx, b) in blocks.iter().enumerate() {
+        match (b.start, b.end) {
+            (Some(s), Some(e)) => {
+                block_index_map.insert((s.timestamp(), e.timestamp()), idx);
+            }
+            (None, None) => {
+                if idx == 0 { first_gap_index = idx; }
+                last_gap_index = idx;
+            }
+            _ => {}
+        }
+    }
 
     for e in all.iter() {
         let ts = e.timestamp;
@@ -237,8 +237,9 @@ pub fn aggregate_events_into_blocks(blocks: &mut Vec<CurrentBlock>, guess: &Vec<
         // Inside any guess block?
         for g in guess.iter() {
             if ts >= g.start && ts <= g.end {
-                if let Some(idx) = find_block_index(g.start, g.end) {
-                    update_block(&mut blocks[idx], e);
+                let key = (g.start.timestamp(), g.end.timestamp());
+                if let Some(&idx) = block_index_map.get(&key) {
+                    update_block(blocks.get_mut(idx).unwrap(), e);
                     placed = true;
                     break;
                 }
@@ -248,7 +249,7 @@ pub fn aggregate_events_into_blocks(blocks: &mut Vec<CurrentBlock>, guess: &Vec<
 
         // First gap
         if ts > guess[0].end {
-            update_block(&mut blocks[first_gap_index], e);
+            update_block(blocks.get_mut(first_gap_index).unwrap(), e);
             continue;
         }
 
@@ -258,11 +259,16 @@ pub fn aggregate_events_into_blocks(blocks: &mut Vec<CurrentBlock>, guess: &Vec<
             let newer = &guess[i];
             let older = &guess[i+1];
             if ts <= newer.start && ts > older.end {
-                if let (Some(nidx), Some(oidx)) = (find_block_index(newer.start, newer.end), find_block_index(older.start, older.end)) {
-                    if let Some(gidx) = find_middle_gap_index(nidx, oidx) {
-                        update_block(&mut blocks[gidx], e);
-                        assigned = true;
-                        break;
+                let key_new = (newer.start.timestamp(), newer.end.timestamp());
+                let key_old = (older.start.timestamp(), older.end.timestamp());
+                if let (Some(&nidx), Some(&oidx)) = (block_index_map.get(&key_new), block_index_map.get(&key_old)) {
+                    if nidx + 1 < oidx {
+                        if let Some(rel) = blocks[nidx + 1..oidx].iter().position(|b| b.start.is_none() && b.end.is_none()) {
+                            let gidx = nidx + 1 + rel;
+                            update_block(blocks.get_mut(gidx).unwrap(), e);
+                            assigned = true;
+                            break;
+                        }
                     }
                 }
             }
@@ -270,7 +276,7 @@ pub fn aggregate_events_into_blocks(blocks: &mut Vec<CurrentBlock>, guess: &Vec<
         if assigned { continue; }
 
         // Last gap
-        update_block(&mut blocks[last_gap_index], e);
+        update_block(blocks.get_mut(last_gap_index).unwrap(), e);
     }
 }
 
@@ -294,4 +300,3 @@ fn update_block(block: &mut CurrentBlock, e: &ClaudeBarUsageEntry) {
         UserRole::Unknown => {}
     }
 }
-
