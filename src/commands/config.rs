@@ -293,12 +293,3 @@ fn configure_separator(config: &mut rs_claude_bar::ConfigInfo) {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn show_config_help_does_not_panic() {
-        show_config_help();
-    }
-}

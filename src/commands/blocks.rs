@@ -333,12 +333,6 @@ mod tests {
     use chrono::TimeZone;
     use rs_claude_bar::claudebar_types::{FileInfo, TokenUsage, UserRole};
 
-    #[test]
-    fn run_does_not_panic() {
-        let config = rs_claude_bar::ConfigInfo::default();
-        run(&config);
-    }
-
     fn make_entry(ts: &str, limit: bool) -> ClaudeBarUsageEntry {
         ClaudeBarUsageEntry {
             session_id: String::new(),

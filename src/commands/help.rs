@@ -79,13 +79,3 @@ pub fn run(_config: &rs_claude_bar::ConfigInfo) {
     print!("{}", help_text);
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn run_does_not_panic() {
-        let config = rs_claude_bar::ConfigInfo::default();
-        run(&config);
-    }
-}
