@@ -8,6 +8,7 @@ pub mod parser;
 pub mod status;
 pub mod types;
 pub mod utils;
+pub mod analyze;
 
 pub use app_dirs::*;
 pub use claude_types::*;
@@ -19,6 +20,7 @@ pub use parser::*;
 pub use status::*;
 pub use types::*;
 pub use utils::*;
+pub use analyze::*;
 
 pub fn generate_claude_status() -> Result<String, Box<dyn std::error::Error>> {
     status::generate_status()

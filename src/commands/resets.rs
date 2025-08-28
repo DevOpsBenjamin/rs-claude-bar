@@ -1,9 +1,9 @@
 use chrono::{DateTime, Duration, Utc};
 use chrono::TimeZone;
-use regex::Regex;
 use rs_claude_bar::{
     claude_types::TranscriptEntry,
     claudebar_types::{AssistantInfo, CurrentBlock, GuessBlock, UserInfo, ClaudeBarUsageEntry, UserRole},
+    analyze::{load_all_entries, parse_reset_time, calculate_unlock_time},
 };
 use std::collections::HashSet;
 use std::fs;
@@ -109,83 +109,40 @@ pub fn run(config: &rs_claude_bar::ConfigInfo) {
     // Keep newest first by end time
     unique.sort_by(|a, b| b.end.cmp(&a.end));
 
-    // Print GuessBlocks table first (for reference)
-    print_guessblocks_table(&unique);
+    // Add one real projected block from latest end -> +5h
+    if let Some(latest) = unique.first().cloned() {
+        let start = latest.end;
+        let end = start + Duration::hours(5);
+        let projected = GuessBlock {
+            msg_timestamp: start,
+            reset: "projected".to_string(),
+            start,
+            end,
+        };
+        // Insert as newest (front)
+        if unique.first().map(|b| b.start != start || b.end != end).unwrap_or(true) {
+            unique.insert(0, projected);
+        }
+    }
+
+    // Print GuessBlocks via debug print (readable)
+    print_guessblocks_debug(&unique);
 
     // Build CurrentBlocks: one per guess block, plus gaps
     let mut current_blocks = build_current_blocks(&unique);
 
-    // Load all events and aggregate into blocks
+    // Load all events and aggregate into blocks (shared helper)
     let mut all = load_all_entries(&base_path);
     all.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
     aggregate_events_into_blocks(&mut current_blocks, &unique, &all);
 
-    // Print CurrentBlocks as a debug table
-    print_currentblocks_table(&current_blocks);
+    // Print CurrentBlocks via debug print (readable)
+    print_currentblocks_debug(&current_blocks);
 }
 
-/// Parse reset time like "10pm" or "10:30 pm" from content
-fn parse_reset_time(content: &str) -> Option<String> {
-    // Pattern: "Reset time: 10pm" or "resets 10pm"
-    let patterns = [
-        r"(?i)reset\s*time:\s*(\d{1,2}(?::\d{2})?\s*(?:am|pm))",
-        r"(?i)resets?\s+(?:at\s+)?(\d{1,2}(?::\d{2})?\s*(?:am|pm))",
-        r"(?i)(?:until|at)\s+(\d{1,2}(?::\d{2})?\s*(?:am|pm))",
-    ];
-    for pat in patterns {
-        if let Ok(re) = Regex::new(pat) {
-            if let Some(caps) = re.captures(content) {
-                return Some(caps[1].to_lowercase());
-            }
-        }
-    }
-    None
-}
 
-/// Calculate unlock time based on limit timestamp and reset time string
-fn calculate_unlock_time(limit_timestamp: DateTime<Utc>, reset_time: &str) -> Option<DateTime<Utc>> {
-    let re = Regex::new(r"(\d{1,2})(?::(\d{2}))?\s*(am|pm)").ok()?;
-    let caps = re.captures(reset_time)?;
-
-    let hour: u32 = caps.get(1)?.as_str().parse().ok()?;
-    let minute: u32 = caps.get(2).map_or(0, |m| m.as_str().parse().unwrap_or(0));
-    let is_pm = caps.get(3)?.as_str().eq_ignore_ascii_case("pm");
-
-    let hour_24 = match (hour, is_pm) {
-        (12, false) => 0,    // 12am -> 0
-        (12, true) => 12,    // 12pm -> 12
-        (h, false) => h,     // am hours
-        (h, true) => h + 12, // pm hours
-    };
-    if hour_24 >= 24 || minute >= 60 { return None; }
-
-    let limit_date = limit_timestamp.date_naive();
-    let same_day = limit_date
-        .and_hms_opt(hour_24, minute, 0)?
-        .and_local_timezone(Utc)
-        .single()?;
-
-    // If reset time already passed at/ before limit timestamp, use next day
-    let unlock = if same_day > limit_timestamp { same_day } else {
-        (limit_date + chrono::Days::new(1))
-            .and_hms_opt(hour_24, minute, 0)?
-            .and_local_timezone(Utc)
-            .single()?
-    };
-    Some(unlock)
-}
-
-fn print_guessblocks_table(rows: &Vec<GuessBlock>) {
-    println!("timestamp|reset|end|start");
-    for b in rows.iter() {
-        println!(
-            "{}|{}|{}|{}",
-            b.msg_timestamp.format("%Y-%m-%d %H:%M UTC"),
-            b.reset,
-            b.end.format("%Y-%m-%d %H:%M UTC"),
-            b.start.format("%Y-%m-%d %H:%M UTC"),
-        );
-    }
+fn print_guessblocks_debug(rows: &Vec<GuessBlock>) {
+    println!("GuessBlocks: {:#?}", rows);
 }
 
 fn build_current_blocks(guess: &Vec<GuessBlock>) -> Vec<CurrentBlock> {
@@ -302,73 +259,8 @@ fn update_block(block: &mut CurrentBlock, e: &ClaudeBarUsageEntry) {
     }
 }
 
-fn print_currentblocks_table(blocks: &Vec<CurrentBlock>) {
-    println!("type|reset|start|end|min|max|assistant_content|assistant_in|assistant_out|assistant_cache_create|assistant_cache_read|assistant_total|user_content");
-    for b in blocks.iter() {
-        let t = if b.start.is_some() && b.end.is_some() { "block" } else { "gap" };
-        let start = b.start.map(|d| d.format("%Y-%m-%d %H:%M UTC").to_string()).unwrap_or_default();
-        let end = b.end.map(|d| d.format("%Y-%m-%d %H:%M UTC").to_string()).unwrap_or_default();
-        let has_events = b.max_timestamp >= b.min_timestamp;
-        let min = if has_events { b.min_timestamp.format("%Y-%m-%d %H:%M UTC").to_string() } else { String::new() };
-        let max = if has_events { b.max_timestamp.format("%Y-%m-%d %H:%M UTC").to_string() } else { String::new() };
-        println!(
-            "{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}",
-            t,
-            b.reset,
-            start,
-            end,
-            min,
-            max,
-            b.assistant.content,
-            b.assistant.input_tokens,
-            b.assistant.output_tokens,
-            b.assistant.cache_creation_tokens,
-            b.assistant.cache_read_tokens,
-            b.assistant.total_tokens,
-            b.user.content,
-        );
-    }
+fn print_currentblocks_debug(blocks: &Vec<CurrentBlock>) {
+    println!("CurrentBlocks: {:#?}", blocks);
 }
 
-// Local reader to get every entry from ~/.claude/projects as ClaudeBarUsageEntry
-fn load_all_entries(base_path: &str) -> Vec<ClaudeBarUsageEntry> {
-    let mut usage_entries = Vec::new();
-    let projects = Path::new(base_path);
-    if !projects.exists() { return usage_entries; }
-
-    if let Ok(entries) = fs::read_dir(projects) {
-        for entry in entries.flatten() {
-            if entry.path().is_dir() {
-                let folder_name = entry.file_name().to_string_lossy().to_string();
-                if let Ok(files) = fs::read_dir(entry.path()) {
-                    for file in files.flatten() {
-                        if file.path().extension().and_then(|s| s.to_str()) == Some("jsonl") {
-                            let file_name = file.file_name().to_string_lossy().to_string();
-                            let file_date = file
-                                .metadata()
-                                .ok()
-                                .and_then(|m| m.modified().ok())
-                                .map(DateTime::<Utc>::from);
-                            if let Ok(content) = fs::read_to_string(file.path()) {
-                                for line in content.lines() {
-                                    let line = line.trim();
-                                    if line.is_empty() { continue; }
-                                    if let Ok(transcript) = serde_json::from_str::<TranscriptEntry>(line) {
-                                        let entry = ClaudeBarUsageEntry::from_transcript(
-                                            &transcript,
-                                            folder_name.clone(),
-                                            file_name.clone(),
-                                            file_date,
-                                        );
-                                        usage_entries.push(entry);
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-    usage_entries
-}
+// shared helpers are imported from rs_claude_bar::analyze
