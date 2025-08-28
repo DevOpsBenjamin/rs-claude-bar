@@ -70,6 +70,7 @@ pub fn run(config: &rs_claude_bar::ConfigInfo) {
         start: DateTime<Utc>,
         end: DateTime<Utc>,
         assistant_output_tokens: i64,
+        assistant_input_tokens: i64,
         projected: bool,
     }
 
@@ -78,10 +79,11 @@ pub fn run(config: &rs_claude_bar::ConfigInfo) {
         if let (Some(s), Some(e)) = (b.start, b.end) {
             let is_projected = b.reset == "projected";
             let out = b.assistant.output_tokens;
-            if out == 0 && !is_projected {
-                continue; // skip zero-token non-projected blocks
+            let inn = b.assistant.input_tokens;
+            if out == 0 && inn == 0 && !is_projected {
+                continue; // skip zero-token (in+out) non-projected blocks
             }
-            simple.push(SimpleBlock { start: s, end: e, assistant_output_tokens: out, projected: is_projected });
+            simple.push(SimpleBlock { start: s, end: e, assistant_output_tokens: out, assistant_input_tokens: inn, projected: is_projected });
         }
     }
 
@@ -89,7 +91,9 @@ pub fn run(config: &rs_claude_bar::ConfigInfo) {
 
     // Slot stats: 0-6, 6-12, 12-18, 18-24; if a 5h block crosses a boundary, count it in both slots
     #[derive(Debug, Default, Clone)]
-    struct SlotStat { count: usize, sum: i128, mean: f64, median: f64, ema: f64 }
+    struct MetricStat { count: usize, mean: f64, median: f64 }
+    #[derive(Debug, Default, Clone)]
+    struct BandStats { input: MetricStat, output: MetricStat, total: MetricStat }
 
     fn slot_label(hour: u32) -> &'static str {
         match hour {
@@ -112,7 +116,9 @@ pub fn run(config: &rs_claude_bar::ConfigInfo) {
     }
 
     use std::collections::HashMap;
-    let mut slot_values: HashMap<&'static str, Vec<(DateTime<Utc>, i64)>> = HashMap::new();
+    let mut slot_values_in: HashMap<&'static str, Vec<i64>> = HashMap::new();
+    let mut slot_values_out: HashMap<&'static str, Vec<i64>> = HashMap::new();
+    let mut slot_values_total: HashMap<&'static str, Vec<i64>> = HashMap::new();
     for sb in &simple {
         if sb.projected { continue; } // don't include projected in stats
         let start = sb.start;
@@ -123,38 +129,41 @@ pub fn run(config: &rs_claude_bar::ConfigInfo) {
             labels.push(slot_label((boundary.hour()) % 24));
         }
         for lab in labels {
-            slot_values.entry(lab).or_default().push((end, sb.assistant_output_tokens));
+            slot_values_in.entry(lab).or_default().push(sb.assistant_input_tokens);
+            slot_values_out.entry(lab).or_default().push(sb.assistant_output_tokens);
+            slot_values_total.entry(lab).or_default().push(sb.assistant_input_tokens + sb.assistant_output_tokens);
         }
     }
-    let mut slot_stats: HashMap<&'static str, SlotStat> = HashMap::new();
-    
     fn compute_median(mut xs: Vec<i64>) -> f64 {
         if xs.is_empty() { return 0.0; }
         xs.sort_unstable();
         let n = xs.len();
         if n % 2 == 1 { xs[n/2] as f64 } else { (xs[n/2 - 1] as f64 + xs[n/2] as f64) / 2.0 }
     }
-    fn compute_ema(mut pairs: Vec<(DateTime<Utc>, i64)>) -> f64 {
-        if pairs.is_empty() { return 0.0; }
-        pairs.sort_by_key(|p| p.0); // chronological
-        let n = pairs.len() as f64;
-        let alpha = 2.0 / (n + 1.0);
-        let mut ema = pairs[0].1 as f64;
-        for &(_, v) in pairs.iter().skip(1) {
-            ema = alpha * (v as f64) + (1.0 - alpha) * ema;
-        }
-        ema
-    }
 
-    for (lab, vals) in slot_values.into_iter() {
-        let count = vals.len();
-        let sum: i128 = vals.iter().map(|(_, v)| *v as i128).sum();
-        let mean = if count > 0 { sum as f64 / count as f64 } else { 0.0 };
-        let median = compute_median(vals.iter().map(|(_, v)| *v).collect());
-        let ema = compute_ema(vals);
-        slot_stats.insert(lab, SlotStat { count, sum, mean, median, ema });
+    // Collect union of labels
+    let labels = ["0-6","6-12","12-18","18-24"];
+    let mut stats: HashMap<&'static str, BandStats> = HashMap::new();
+    for &lab in &labels {
+        let ins = slot_values_in.remove(lab).unwrap_or_default();
+        let outs = slot_values_out.remove(lab).unwrap_or_default();
+        let tots = slot_values_total.remove(lab).unwrap_or_default();
+        let in_count = ins.len();
+        let out_count = outs.len();
+        let tot_count = tots.len();
+        let in_mean = if in_count>0 { ins.iter().map(|v| *v as i128).sum::<i128>() as f64 / in_count as f64 } else {0.0};
+        let out_mean = if out_count>0 { outs.iter().map(|v| *v as i128).sum::<i128>() as f64 / out_count as f64 } else {0.0};
+        let tot_mean = if tot_count>0 { tots.iter().map(|v| *v as i128).sum::<i128>() as f64 / tot_count as f64 } else {0.0};
+        let in_med = compute_median(ins);
+        let out_med = compute_median(outs);
+        let tot_med = compute_median(tots);
+        stats.insert(lab, BandStats {
+            input:  MetricStat { count: in_count,  mean: in_mean,  median: in_med },
+            output: MetricStat { count: out_count, mean: out_mean, median: out_med },
+            total:  MetricStat { count: tot_count, mean: tot_mean, median: tot_med },
+        });
     }
-    println!("SlotStats: {:#?}", slot_stats);
+    println!("SlotStats: {:#?}", stats);
 }
 fn print_guessblocks_debug(rows: &Vec<GuessBlock>) {
     println!("GuessBlocks: {:#?}", rows);
