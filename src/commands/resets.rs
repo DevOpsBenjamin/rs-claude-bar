@@ -87,11 +87,18 @@ pub fn run(config: &rs_claude_bar::ConfigInfo) {
         }
     }
 
-    println!("SimpleBlocks: {:#?}", simple);
+    // Keep only the last 10 blocks, sorted old -> recent (projected likely last)
+    let mut simple_sorted = simple.clone();
+    simple_sorted.sort_by_key(|b| b.start);
+    if simple_sorted.len() > 10 {
+        let start = simple_sorted.len() - 10;
+        simple_sorted = simple_sorted[start..].to_vec();
+    }
+    println!("SimpleBlocks: {:#?}", simple_sorted);
 
     // Slot stats: 0-6, 6-12, 12-18, 18-24; if a 5h block crosses a boundary, count it in both slots
     #[derive(Debug, Default, Clone)]
-    struct MetricStat { count: usize, mean: f64, median: f64 }
+    struct MetricStat { count: usize, mean: f64, min: i64, max: i64 }
     #[derive(Debug, Default, Clone)]
     struct BandStats { input: MetricStat, output: MetricStat, total: MetricStat }
 
@@ -134,13 +141,7 @@ pub fn run(config: &rs_claude_bar::ConfigInfo) {
             slot_values_total.entry(lab).or_default().push(sb.assistant_input_tokens + sb.assistant_output_tokens);
         }
     }
-    fn compute_median(mut xs: Vec<i64>) -> f64 {
-        if xs.is_empty() { return 0.0; }
-        xs.sort_unstable();
-        let n = xs.len();
-        if n % 2 == 1 { xs[n/2] as f64 } else { (xs[n/2 - 1] as f64 + xs[n/2] as f64) / 2.0 }
-    }
-
+    
     // Collect union of labels
     let labels = ["0-6","6-12","12-18","18-24"];
     let mut stats: HashMap<&'static str, BandStats> = HashMap::new();
@@ -154,13 +155,16 @@ pub fn run(config: &rs_claude_bar::ConfigInfo) {
         let in_mean = if in_count>0 { ins.iter().map(|v| *v as i128).sum::<i128>() as f64 / in_count as f64 } else {0.0};
         let out_mean = if out_count>0 { outs.iter().map(|v| *v as i128).sum::<i128>() as f64 / out_count as f64 } else {0.0};
         let tot_mean = if tot_count>0 { tots.iter().map(|v| *v as i128).sum::<i128>() as f64 / tot_count as f64 } else {0.0};
-        let in_med = compute_median(ins);
-        let out_med = compute_median(outs);
-        let tot_med = compute_median(tots);
+        let in_min = ins.iter().min().copied().unwrap_or(0);
+        let in_max = ins.iter().max().copied().unwrap_or(0);
+        let out_min = outs.iter().min().copied().unwrap_or(0);
+        let out_max = outs.iter().max().copied().unwrap_or(0);
+        let tot_min = tots.iter().min().copied().unwrap_or(0);
+        let tot_max = tots.iter().max().copied().unwrap_or(0);
         stats.insert(lab, BandStats {
-            input:  MetricStat { count: in_count,  mean: in_mean,  median: in_med },
-            output: MetricStat { count: out_count, mean: out_mean, median: out_med },
-            total:  MetricStat { count: tot_count, mean: tot_mean, median: tot_med },
+            input:  MetricStat { count: in_count,  mean: in_mean,  min: in_min,  max: in_max },
+            output: MetricStat { count: out_count, mean: out_mean, min: out_min, max: out_max },
+            total:  MetricStat { count: tot_count, mean: tot_mean, min: tot_min, max: tot_max },
         });
     }
     println!("SlotStats: {:#?}", stats);

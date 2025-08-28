@@ -1,5 +1,6 @@
 use chrono::{DateTime, Duration, Utc};
 use regex::Regex;
+use rs_claude_bar::analyze::{parse_reset_time, calculate_unlock_time};
 use rs_claude_bar::{
     claude_types::TranscriptEntry, claudebar_types::ClaudeBarUsageEntry, colors::*,
 };
@@ -287,75 +288,7 @@ fn get_entry_content_text(entry: &ClaudeBarUsageEntry) -> String {
 }
 
 /// Parse reset time from limit message content
-fn parse_reset_time(content: &str) -> Option<String> {
-    // Pattern for "resets 10pm" (with bullet separator ∙)
-    let re = Regex::new(r"(?i)resets?\s+(\d{1,2}(?::\d{2})?\s*(?:am|pm))").ok()?;
-    if let Some(caps) = re.captures(content) {
-        return Some(caps[1].to_lowercase());
-    }
-
-    // Pattern for "resets at 10pm"
-    let re2 = Regex::new(r"(?i)resets?\s+at\s+(\d{1,2}(?::\d{2})?\s*(?:am|pm))").ok()?;
-    if let Some(caps) = re2.captures(content) {
-        return Some(caps[1].to_lowercase());
-    }
-
-    // Try alternative patterns like "until 10pm" or "at 10pm"
-    let re3 = Regex::new(r"(?i)(?:until|at)\s+(\d{1,2}(?::\d{2})?\s*(?:am|pm))").ok()?;
-    if let Some(caps) = re3.captures(content) {
-        return Some(caps[1].to_lowercase());
-    }
-
-    None
-}
-
-/// Calculate unlock time based on limit timestamp and reset time
-fn calculate_unlock_time(
-    limit_timestamp: DateTime<Utc>,
-    reset_time: &str,
-) -> Option<DateTime<Utc>> {
-    // Parse the reset time (e.g., "10pm", "10:30pm")
-    let re = Regex::new(r"(\d{1,2})(?::(\d{2}))?\s*(am|pm)").ok()?;
-    let caps = re.captures(reset_time)?;
-
-    let hour: u32 = caps[1].parse().ok()?;
-    let minute: u32 = caps.get(2).map_or(0, |m| m.as_str().parse().unwrap_or(0));
-    let is_pm = caps[3].eq_ignore_ascii_case("pm");
-
-    // Convert to 24-hour format
-    let hour_24 = match (hour, is_pm) {
-        (12, false) => 0,    // 12am -> 0
-        (12, true) => 12,    // 12pm -> 12
-        (h, false) => h,     // am hours
-        (h, true) => h + 12, // pm hours
-    };
-
-    if hour_24 >= 24 || minute >= 60 {
-        return None;
-    }
-
-    // Get the date of the limit timestamp
-    let limit_date = limit_timestamp.date_naive();
-
-    // Create reset time on the same day
-    let reset_time_same_day = limit_date
-        .and_hms_opt(hour_24, minute, 0)?
-        .and_local_timezone(Utc)
-        .single()?;
-
-    // If the reset time already passed today, it's tomorrow
-    let unlock_time = if reset_time_same_day > limit_timestamp {
-        reset_time_same_day
-    } else {
-        // Add one day
-        (limit_date + Duration::days(1))
-            .and_hms_opt(hour_24, minute, 0)?
-            .and_local_timezone(Utc)
-            .single()?
-    };
-
-    Some(unlock_time)
-}
+// parse_reset_time and calculate_unlock_time now reused from rs_claude_bar::analyze
 
 fn format_duration_hours(duration: Duration) -> String {
     let total_hours = duration.num_hours();
