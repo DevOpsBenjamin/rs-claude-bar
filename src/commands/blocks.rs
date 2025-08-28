@@ -1,5 +1,4 @@
 use chrono::{DateTime, Duration, Utc};
-use regex::Regex;
 use rs_claude_bar::analyze::{parse_reset_time, calculate_unlock_time};
 use rs_claude_bar::{
     claude_types::TranscriptEntry, claudebar_types::ClaudeBarUsageEntry, colors::*,
@@ -20,6 +19,7 @@ pub struct UsageBlock {
 }
 
 pub fn run(config: &rs_claude_bar::ConfigInfo) {
+    let mut updated_config = config.clone();
     let base_path = format!("{}/projects", config.claude_data_path);
     let path = Path::new(&base_path);
 
@@ -36,11 +36,23 @@ pub fn run(config: &rs_claude_bar::ConfigInfo) {
     );
     println!();
 
-    // Load all entries
-    let mut all_entries = load_all_entries(&base_path);
+    // Load entries using caching mechanism  
+    // If this is first run (no last_limit_date), load all entries
+    let use_incremental = config.last_limit_date.is_some();
+    let mut all_entries = if use_incremental {
+        rs_claude_bar::analyze::load_entries_since(&base_path, config.last_limit_date)
+    } else {
+        rs_claude_bar::analyze::load_all_entries(&base_path)
+    };
+    
     if all_entries.is_empty() {
-        println!("❌ No usage entries found!");
-        return;
+        if use_incremental {
+            println!("✅ No new entries since last run.");
+            return;
+        } else {
+            println!("❌ No usage entries found!");
+            return;
+        }
     }
 
     // Sort by timestamp (descending for analysis)
@@ -125,6 +137,20 @@ pub fn run(config: &rs_claude_bar::ConfigInfo) {
 
         println!("  Total entries: {}", block.entries.len());
         println!();
+    }
+    
+    // Update config with the latest block date for next run
+    // This needs to be implemented differently as we're not using CurrentBlock here
+    // For now, we'll find the latest non-projected block from our analysis
+    if let Some(latest_real_block) = blocks.iter()
+        .filter(|b| !b.guessed && b.limit_reached)
+        .max_by_key(|b| b.end_time.unwrap_or(Utc::now())) {
+        updated_config.last_limit_date = latest_real_block.end_time;
+        
+        // Save updated config
+        if let Err(e) = rs_claude_bar::config_manager::save_config(&updated_config) {
+            eprintln!("Warning: Could not save updated config: {}", e);
+        }
     }
 }
 

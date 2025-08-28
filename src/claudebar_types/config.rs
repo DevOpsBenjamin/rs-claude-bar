@@ -1,5 +1,25 @@
 use serde::{Deserialize, Serialize};
+use chrono::{DateTime, Utc};
 use std::env;
+
+/// Simple block for stats storage
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SimpleBlock {
+    pub start: DateTime<Utc>,
+    pub end: DateTime<Utc>, 
+    pub tokens: i64,
+}
+
+/// Stats file structure
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StatsFile {
+    /// Past completed blocks (ascending order by start)
+    pub past: Vec<SimpleBlock>,
+    /// Current active block (if any)
+    pub current: Option<SimpleBlock>,
+    /// Last processed timestamp
+    pub last_processed: Option<DateTime<Utc>>,
+}
 
 /// Main configuration for Claude Bar application
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -12,6 +32,9 @@ pub struct ConfigInfo {
     
     /// Display preferences
     pub display: DisplayConfig,
+    
+    /// Last processed limit date for caching (most recent non-projected block)
+    pub last_limit_date: Option<DateTime<Utc>>,
 }
 
 /// Display configuration options
@@ -37,6 +60,7 @@ impl Default for ConfigInfo {
             version: "1.0.0".to_string(),
             claude_data_path: default_claude_path,
             display: DisplayConfig::default(),
+            last_limit_date: None,
         }
     }
 }
@@ -47,6 +71,16 @@ impl Default for DisplayConfig {
             use_colors: true,
             show_progress_bars: true,
             compact_mode: false,
+        }
+    }
+}
+
+impl Default for StatsFile {
+    fn default() -> Self {
+        Self {
+            past: Vec::new(),
+            current: None,
+            last_processed: None,
         }
     }
 }

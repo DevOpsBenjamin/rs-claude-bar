@@ -1,12 +1,13 @@
-use chrono::{Utc, DateTime, Timelike, Duration};
+use chrono::{Utc, Duration};
 use rs_claude_bar::{
-    claudebar_types::{CurrentBlock, GuessBlock, ClaudeBarUsageEntry},
+    claudebar_types::{GuessBlock, ClaudeBarUsageEntry, SimpleBlock, StatsFile},
     analyze::{
-        load_all_entries,
+        load_entries_since,
         build_guess_blocks_from_entries,
-        build_current_blocks_from_guess,
-        aggregate_events_into_blocks,
+        detect_block_status,
+        BlockStatus,
     },
+    config_manager::{load_stats, save_stats},
 };
 use std::path::Path;
 
@@ -21,160 +22,261 @@ pub fn run(config: &rs_claude_bar::ConfigInfo) {
         return;
     }
 
-    // Use shared loader to get all entries and then filter limit ones
-    let mut all_entries = load_all_entries(&base_path);
+    // Load existing stats
+    let mut stats = load_stats();
+    let now = Utc::now();
+    
+    // Detect current block status
+    let block_status = detect_block_status(now, &stats.current);
+    
+    // Load entries since last processing
+    let since = stats.last_processed;
+    let mut all_entries = load_entries_since(&base_path, since);
+    
+    if all_entries.is_empty() && since.is_some() {
+        println!("✅ No new entries since last run.");
+        // Still need to show existing stats
+        display_simple_blocks(&stats);
+        return;
+    }
+    
+    // Process new entries if we have them
+    if !all_entries.is_empty() {
+        all_entries.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
+        stats.last_processed = Some(all_entries.first().unwrap().timestamp);
+    }
+    
     let limit_entries: Vec<ClaudeBarUsageEntry> = all_entries
         .iter()
         .cloned()
         .filter(|e| e.is_limit_reached)
         .collect();
-
-    if limit_entries.is_empty() {
-        println!("No limit messages found.");
+    
+    if all_entries.is_empty() {
+        println!("❌ No usage entries found!");
         return;
     }
 
-    // Build GuessBlocks via shared helper (handles dedup, sort, projected block)
-    let guess_blocks: Vec<GuessBlock> = build_guess_blocks_from_entries(&limit_entries);
-
-    // Print GuessBlocks via debug print (readable)
-    print_guessblocks_debug(&guess_blocks);
-
-    // Build CurrentBlocks: one per guess block, plus gaps
-    let mut current_blocks: Vec<CurrentBlock> = build_current_blocks_from_guess(&guess_blocks, Utc::now());
-
-    // Aggregate all events into blocks
-    all_entries.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
-    aggregate_events_into_blocks(&mut current_blocks, &guess_blocks, &all_entries);
-
-    // For debug: remove zero-activity GAP blocks only; keep all real blocks, including projected
-    let filtered_debug: Vec<CurrentBlock> = current_blocks
-        .iter()
-        .cloned()
-        .filter(|b| {
-            let is_gap = b.start.is_none() && b.end.is_none();
-            if is_gap {
-                b.assistant.total_tokens > 0 || b.assistant.content > 0 || b.user.content > 0
+    // Process new limit entries and update stats
+    if !limit_entries.is_empty() {
+        // Build GuessBlocks from new limit entries
+        let new_guess_blocks: Vec<GuessBlock> = build_guess_blocks_from_entries(&limit_entries);
+        
+        // Convert new completed blocks to SimpleBlocks and add to past
+        for guess in &new_guess_blocks {
+            if guess.reset != "projected" {
+                let simple_block = SimpleBlock {
+                    start: guess.start,
+                    end: guess.end,
+                    tokens: 0, // Will be filled in by aggregation
+                };
+                
+                // Check if this block already exists in past
+                if !stats.past.iter().any(|b| b.start == simple_block.start && b.end == simple_block.end) {
+                    stats.past.push(simple_block);
+                }
+            }
+        }
+        
+        // Sort past blocks by start time (ascending)
+        stats.past.sort_by_key(|b| b.start);
+    }
+    
+    // Update current block based on block status and now time
+    match block_status {
+        BlockStatus::NoCurrentBlock => {
+            // Create new current block starting from now
+            let current_start = now;
+            let current_end = now + Duration::hours(5);
+            stats.current = Some(SimpleBlock {
+                start: current_start,
+                end: current_end,
+                tokens: 0,
+            });
+        }
+        BlockStatus::NeedNewBlock => {
+            // Move current block to past (if it has tokens) and create projected block
+            if let Some(current) = stats.current.take() {
+                if current.tokens > 0 {
+                    // Add completed block to past
+                    if !stats.past.iter().any(|b| b.start == current.start && b.end == current.end) {
+                        stats.past.push(current);
+                        stats.past.sort_by_key(|b| b.start);
+                    }
+                }
+            }
+            
+            // Try to find reset time from recent limit entries
+            if let Some(reset_time) = find_reset_time_from_entries(&limit_entries) {
+                // Calculate next block start from reset time
+                if let Some(next_start) = rs_claude_bar::analyze::calculate_unlock_time(now, &reset_time) {
+                    let next_end = next_start + Duration::hours(5);
+                    stats.current = Some(SimpleBlock {
+                        start: next_start,
+                        end: next_end,
+                        tokens: 0,
+                    });
+                } else {
+                    // Fallback: create block starting in 5 hours
+                    let next_start = now + Duration::hours(5);
+                    let next_end = next_start + Duration::hours(5);
+                    stats.current = Some(SimpleBlock {
+                        start: next_start,
+                        end: next_end,
+                        tokens: 0,
+                    });
+                }
             } else {
-                true
+                // No reset time found, create block starting in 5 hours
+                let next_start = now + Duration::hours(5);
+                let next_end = next_start + Duration::hours(5);
+                stats.current = Some(SimpleBlock {
+                    start: next_start,
+                    end: next_end,
+                    tokens: 0,
+                });
             }
-        })
-        .collect();
-
-    // Print CurrentBlocks via debug print (readable)
-    print_currentblocks_debug(&filtered_debug);
-
-    // Build a simple array of non-gap blocks: start, end, assistant.output_tokens
-    #[derive(Debug, Clone)]
-    struct SimpleBlock {
-        start: DateTime<Utc>,
-        end: DateTime<Utc>,
-        assistant_output_tokens: i64,
-        assistant_input_tokens: i64,
-        projected: bool,
-    }
-
-    let mut simple: Vec<SimpleBlock> = Vec::new();
-    for b in &current_blocks {
-        if let (Some(s), Some(e)) = (b.start, b.end) {
-            let is_projected = b.reset == "projected";
-            let out = b.assistant.output_tokens;
-            let inn = b.assistant.input_tokens;
-            if out == 0 && inn == 0 && !is_projected {
-                continue; // skip zero-token (in+out) non-projected blocks
-            }
-            simple.push(SimpleBlock { start: s, end: e, assistant_output_tokens: out, assistant_input_tokens: inn, projected: is_projected });
         }
-    }
-
-    // Keep only the last 10 blocks, sorted old -> recent (projected likely last)
-    let mut simple_sorted = simple.clone();
-    simple_sorted.sort_by_key(|b| b.start);
-    if simple_sorted.len() > 10 {
-        let start = simple_sorted.len() - 10;
-        simple_sorted = simple_sorted[start..].to_vec();
-    }
-    println!("SimpleBlocks: {:#?}", simple_sorted);
-
-    // Slot stats: 0-6, 6-12, 12-18, 18-24; if a 5h block crosses a boundary, count it in both slots
-    #[derive(Debug, Default, Clone)]
-    struct MetricStat { count: usize, mean: f64, min: i64, max: i64 }
-    #[derive(Debug, Default, Clone)]
-    struct BandStats { input: MetricStat, output: MetricStat, total: MetricStat }
-
-    fn slot_label(hour: u32) -> &'static str {
-        match hour {
-            0..=5 => "0-6",
-            6..=11 => "6-12",
-            12..=17 => "12-18",
-            _ => "18-24",
+        BlockStatus::InCurrentBlock => {
+            // Keep existing current block
         }
-    }
-
-    fn next_boundary_after(dt: DateTime<Utc>) -> DateTime<Utc> {
-        let h = dt.hour();
-        // boundaries at 6,12,18,24
-        let next_h = if h < 6 { 6 } else if h < 12 { 12 } else if h < 18 { 18 } else { 24 };
-        let day = dt.date_naive();
-        let base = day.and_hms_opt(0, 0, 0).unwrap().and_local_timezone(Utc).single().unwrap();
-        let mut boundary = base + Duration::hours(next_h as i64);
-        if boundary <= dt { boundary += Duration::hours(24); }
-        boundary
-    }
-
-    use std::collections::HashMap;
-    let mut slot_values_in: HashMap<&'static str, Vec<i64>> = HashMap::new();
-    let mut slot_values_out: HashMap<&'static str, Vec<i64>> = HashMap::new();
-    let mut slot_values_total: HashMap<&'static str, Vec<i64>> = HashMap::new();
-    for sb in &simple {
-        if sb.projected { continue; } // don't include projected in stats
-        let start = sb.start;
-        let end = sb.end;
-        let mut labels = vec![slot_label(start.hour())];
-        let boundary = next_boundary_after(start);
-        if boundary < end {
-            labels.push(slot_label((boundary.hour()) % 24));
-        }
-        for lab in labels {
-            slot_values_in.entry(lab).or_default().push(sb.assistant_input_tokens);
-            slot_values_out.entry(lab).or_default().push(sb.assistant_output_tokens);
-            slot_values_total.entry(lab).or_default().push(sb.assistant_input_tokens + sb.assistant_output_tokens);
+        BlockStatus::BeforeCurrentBlock => {
+            // We're before the scheduled reset time - show limit status
         }
     }
     
-    // Collect union of labels
-    let labels = ["0-6","6-12","12-18","18-24"];
-    let mut stats: HashMap<&'static str, BandStats> = HashMap::new();
-    for &lab in &labels {
-        let ins = slot_values_in.remove(lab).unwrap_or_default();
-        let outs = slot_values_out.remove(lab).unwrap_or_default();
-        let tots = slot_values_total.remove(lab).unwrap_or_default();
-        let in_count = ins.len();
-        let out_count = outs.len();
-        let tot_count = tots.len();
-        let in_mean = if in_count>0 { ins.iter().map(|v| *v as i128).sum::<i128>() as f64 / in_count as f64 } else {0.0};
-        let out_mean = if out_count>0 { outs.iter().map(|v| *v as i128).sum::<i128>() as f64 / out_count as f64 } else {0.0};
-        let tot_mean = if tot_count>0 { tots.iter().map(|v| *v as i128).sum::<i128>() as f64 / tot_count as f64 } else {0.0};
-        let in_min = ins.iter().min().copied().unwrap_or(0);
-        let in_max = ins.iter().max().copied().unwrap_or(0);
-        let out_min = outs.iter().min().copied().unwrap_or(0);
-        let out_max = outs.iter().max().copied().unwrap_or(0);
-        let tot_min = tots.iter().min().copied().unwrap_or(0);
-        let tot_max = tots.iter().max().copied().unwrap_or(0);
-        stats.insert(lab, BandStats {
-            input:  MetricStat { count: in_count,  mean: in_mean,  min: in_min,  max: in_max },
-            output: MetricStat { count: out_count, mean: out_mean, min: out_min, max: out_max },
-            total:  MetricStat { count: tot_count, mean: tot_mean, min: tot_min, max: tot_max },
-        });
+    // Aggregate tokens for all blocks (including current)
+    if !all_entries.is_empty() {
+        update_block_tokens(&mut stats, &all_entries);
     }
-    println!("SlotStats: {:#?}", stats);
-}
-fn print_guessblocks_debug(rows: &Vec<GuessBlock>) {
-    println!("GuessBlocks: {:#?}", rows);
+    
+    // Save updated stats
+    if let Err(e) = save_stats(&stats) {
+        eprintln!("Warning: Could not save stats: {}", e);
+    }
+    
+    // Display the results
+    display_simple_blocks(&stats);
 }
 
-fn print_currentblocks_debug(blocks: &Vec<CurrentBlock>) {
-    println!("CurrentBlocks: {:#?}", blocks);
+/// Display the simple blocks stats
+fn display_simple_blocks(stats: &StatsFile) {
+    let now = Utc::now();
+    let block_status = detect_block_status(now, &stats.current);
+    
+    println!("📊 Simple Blocks Stats");
+    println!();
+    
+    // Show status based on current situation
+    match block_status {
+        BlockStatus::NeedNewBlock => {
+            if let Some(current) = &stats.current {
+                println!("🔴 LIMIT REACHED - Resets at {}", current.start.format("%Y-%m-%d %H:%M UTC"));
+                println!();
+            }
+        }
+        BlockStatus::BeforeCurrentBlock => {
+            if let Some(current) = &stats.current {
+                println!("🔴 LIMIT - Resets at {}", current.start.format("%Y-%m-%d %H:%M UTC"));
+                println!();
+            }
+        }
+        BlockStatus::InCurrentBlock => {
+            if let Some(current) = &stats.current {
+                let remaining = current.end.signed_duration_since(now);
+                let remaining_str = if remaining.num_hours() > 0 {
+                    format!("{}h {}m", remaining.num_hours(), remaining.num_minutes() % 60)
+                } else {
+                    format!("{}m", remaining.num_minutes())
+                };
+                println!("🟢 ACTIVE - {} remaining | {} tokens", remaining_str, current.tokens);
+                println!();
+            }
+        }
+        BlockStatus::NoCurrentBlock => {
+            println!("🟡 NO ACTIVE BLOCK");
+            println!();
+        }
+    }
+    
+    if stats.past.is_empty() && stats.current.is_none() {
+        println!("No blocks found.");
+        return;
+    }
+    
+    // Show past blocks (last 10, ascending order)
+    let mut display_past = stats.past.clone();
+    if display_past.len() > 10 {
+        let start = display_past.len() - 10;
+        display_past = display_past[start..].to_vec();
+    }
+    
+    if !display_past.is_empty() {
+        println!("Past Blocks:");
+        for (i, block) in display_past.iter().enumerate() {
+            println!("  Block {}: {} - {} | {} tokens", 
+                     i + 1,
+                     block.start.format("%m-%d %H:%M"),
+                     block.end.format("%m-%d %H:%M"),
+                     block.tokens);
+        }
+    }
+    
+    // Show current block details
+    if let Some(current) = &stats.current {
+        println!();
+        println!("Current Block:");
+        println!("  {} - {} | {} tokens", 
+                 current.start.format("%Y-%m-%d %H:%M UTC"),
+                 current.end.format("%Y-%m-%d %H:%M UTC"),
+                 current.tokens);
+    }
+    
+    if let Some(last_processed) = stats.last_processed {
+        println!();
+        println!("Last processed: {}", last_processed.format("%Y-%m-%d %H:%M UTC"));
+    }
 }
 
-// shared helpers are imported from rs_claude_bar::analyze
+/// Find reset time from limit entries
+fn find_reset_time_from_entries(entries: &[ClaudeBarUsageEntry]) -> Option<String> {
+    // Find the most recent limit entry with reset time
+    for entry in entries.iter() {
+        if let Some(content) = &entry.content_text {
+            if let Some(reset_time) = rs_claude_bar::analyze::parse_reset_time(content) {
+                return Some(reset_time);
+            }
+        }
+    }
+    None
+}
+
+/// Update token counts for blocks based on entries
+fn update_block_tokens(stats: &mut StatsFile, entries: &[ClaudeBarUsageEntry]) {
+    use rs_claude_bar::claudebar_types::UserRole;
+    
+    for entry in entries {
+        if !matches!(entry.role, UserRole::Assistant) {
+            continue;
+        }
+        
+        let tokens = entry.usage.output_tokens as i64;
+        let timestamp = entry.timestamp;
+        
+        // Check if entry belongs to current block
+        if let Some(current) = &mut stats.current {
+            if timestamp >= current.start && timestamp <= current.end {
+                current.tokens += tokens;
+                continue;
+            }
+        }
+        
+        // Check if entry belongs to any past block
+        for past_block in &mut stats.past {
+            if timestamp >= past_block.start && timestamp <= past_block.end {
+                past_block.tokens += tokens;
+                break;
+            }
+        }
+    }
+}

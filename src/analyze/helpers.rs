@@ -10,6 +10,11 @@ use crate::{
 
 /// Public: load every entry from `~/.claude/projects`-style path
 pub fn load_all_entries(base_path: &str) -> Vec<ClaudeBarUsageEntry> {
+    load_entries_since(base_path, None)
+}
+
+/// Public: load entries from files modified after a given date (for caching)
+pub fn load_entries_since(base_path: &str, since: Option<DateTime<Utc>>) -> Vec<ClaudeBarUsageEntry> {
     let mut usage_entries = Vec::new();
     let projects = Path::new(base_path);
     if !projects.exists() {
@@ -29,6 +34,14 @@ pub fn load_all_entries(base_path: &str) -> Vec<ClaudeBarUsageEntry> {
                                 .ok()
                                 .and_then(|m| m.modified().ok())
                                 .map(DateTime::<Utc>::from);
+                            
+                            // Skip files that haven't been modified since the last cache date
+                            if let (Some(since_date), Some(file_mod_date)) = (since, file_date) {
+                                if file_mod_date <= since_date {
+                                    continue;
+                                }
+                            }
+                            
                             if let Ok(content) = fs::read_to_string(file.path()) {
                                 for line in content.lines() {
                                     let line = line.trim();
@@ -164,7 +177,7 @@ pub fn build_current_blocks_from_guess(guess: &Vec<GuessBlock>, now: DateTime<Ut
     let mut blocks: Vec<CurrentBlock> = Vec::new();
 
     // Helper to make an empty block with placeholder min/max
-    let mut empty_block = |reset: &str, start: Option<DateTime<Utc>>, end: Option<DateTime<Utc>>| CurrentBlock {
+    let empty_block = |reset: &str, start: Option<DateTime<Utc>>, end: Option<DateTime<Utc>>| CurrentBlock {
         reset: reset.to_string(),
         start,
         end,
@@ -278,6 +291,46 @@ pub fn aggregate_events_into_blocks(blocks: &mut Vec<CurrentBlock>, guess: &Vec<
         // Last gap
         update_block(blocks.get_mut(last_gap_index).unwrap(), e);
     }
+}
+
+/// Public: update config with the most recent non-projected block date
+pub fn update_last_limit_date(config: &mut crate::claudebar_types::ConfigInfo, blocks: &[CurrentBlock]) {
+    // Find the most recent non-projected block end time
+    let latest_non_projected = blocks
+        .iter()
+        .filter(|b| b.reset != "projected" && b.end.is_some())
+        .max_by_key(|b| b.end.unwrap());
+    
+    if let Some(latest_block) = latest_non_projected {
+        config.last_limit_date = latest_block.end;
+    }
+}
+
+/// Detect if we're in a current 5-hour block or have moved to a new one
+pub fn detect_block_status(now: DateTime<Utc>, current: &Option<crate::claudebar_types::SimpleBlock>) -> BlockStatus {
+    match current {
+        None => BlockStatus::NoCurrentBlock,
+        Some(block) => {
+            if now < block.start {
+                // We're before the block starts (shouldn't happen normally)
+                BlockStatus::BeforeCurrentBlock
+            } else if now >= block.start && now <= block.end {
+                // We're within the current block
+                BlockStatus::InCurrentBlock
+            } else {
+                // We're past the current block - need a new one
+                BlockStatus::NeedNewBlock
+            }
+        }
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub enum BlockStatus {
+    NoCurrentBlock,        // No current block exists
+    BeforeCurrentBlock,    // Current time is before block start
+    InCurrentBlock,        // We're within the current 5-hour block
+    NeedNewBlock,         // Current block has ended, need new one
 }
 
 fn update_block(block: &mut CurrentBlock, e: &ClaudeBarUsageEntry) {
