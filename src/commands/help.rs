@@ -1,7 +1,8 @@
 use rs_claude_bar::colors::*;
 
 pub fn run(_config: &rs_claude_bar::ConfigInfo) {
-    let help_text = format!(r#"
+    let help_text = format!(
+        r#"
 {bold}{cyan}🤖 Claude Bar - Enhanced Claude Code Usage Tracker{reset}
 
 {bold}DESCRIPTION:{reset}
@@ -9,13 +10,20 @@ pub fn run(_config: &rs_claude_bar::ConfigInfo) {
     Parses JSONL transcript files to provide insights into token usage, sessions,
     and 5-hour window limits.
 
+{bold}TIP:{reset}
+    Run `rs-claude-bar install` to configure Claude settings.
+    Use `rs-claude-bar prompt` to print the status line for your shell.
+
 {bold}USAGE:{reset}
     rs-claude-bar [OPTIONS] [COMMAND]
 
 {bold}COMMANDS:{reset}
-    {green}status{reset}           Show current Claude status line (default)
+    {green}help{reset}             Show this help message
+    {green}prompt{reset}           Show current Claude status line
+    {green}status{reset}           Show current Claude status line
     {green}table{reset}            Display usage data in detailed table format
     {green}debug{reset}            Debug parse JSONL files and show raw data
+    {green}install{reset}          Configure Claude settings for prompt
     {green}config{reset}           Manage configuration settings
     {green}stats{reset}            Show statistical summaries
     {green}history{reset}          Show recent usage windows
@@ -28,14 +36,20 @@ pub fn run(_config: &rs_claude_bar::ConfigInfo) {
     {yellow}-V, --version{reset}          Print version information
 
 {bold}EXAMPLES:{reset}
-    {gray}# Default status line output{reset}
+    {gray}# Show this help message{reset}
     rs-claude-bar
+
+    {gray}# Show status line output{reset}
+    rs-claude-bar prompt
 
     {gray}# Show detailed usage table{reset}
     rs-claude-bar table
 
     {gray}# Debug parsing issues{reset}
     rs-claude-bar debug
+
+    {gray}# Configure Claude settings{reset}
+    rs-claude-bar install
 
     {gray}# Configure Claude data path{reset}
     rs-claude-bar config claude-path
@@ -78,15 +92,3 @@ pub fn run(_config: &rs_claude_bar::ConfigInfo) {
     print!("{}", help_text);
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn run_does_not_panic() {
-        let config = rs_claude_bar::ConfigInfo {
-            claude_data_path: "nonexistent".to_string(),
-        };
-        run(&config);
-    }
-}

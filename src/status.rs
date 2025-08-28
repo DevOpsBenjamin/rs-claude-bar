@@ -1,10 +1,43 @@
-use crate::colors::*;
-use crate::parser::{group_entries_into_windows, load_claude_data};
-use crate::utils::{format_duration, format_token_count};
-use chrono::{Duration, Utc};
+use crate::{
+    colors::*,
+    display::DisplayManager,
+    config_manager::load_stats,
+    claudebar_types::ConfigInfo,
+};
 
 /// Generate the complete status line for Claude Code
 pub fn generate_status() -> Result<String, Box<dyn std::error::Error>> {
+    generate_status_with_config(&ConfigInfo::default())
+}
+
+/// Generate status with specific configuration
+pub fn generate_status_with_config(config: &ConfigInfo) -> Result<String, Box<dyn std::error::Error>> {
+    generate_status_with_config_and_model(config, None)
+}
+
+/// Generate status with specific configuration and model info
+pub fn generate_status_with_config_and_model(config: &ConfigInfo, model_name: Option<String>) -> Result<String, Box<dyn std::error::Error>> {
+    // Load stats file
+    let stats = load_stats();
+    
+    // Create display manager from config
+    let display_manager = DisplayManager::new(config.display.items.clone())
+        .with_separator(config.display.separator.clone());
+    
+    // Create display data from stats with model info
+    let display_data = DisplayManager::create_display_data_with_model(&stats, model_name);
+    
+    // Generate status line
+    Ok(display_manager.render_status_line(&display_data))
+}
+
+// Legacy status line function - kept for compatibility
+#[allow(dead_code)]
+fn generate_legacy_status() -> Result<String, Box<dyn std::error::Error>> {
+    use crate::parser::{group_entries_into_windows, load_claude_data};
+    
+    
+
     // Load all entries from Claude data
     let all_entries = load_claude_data()?;
 
@@ -23,13 +56,17 @@ pub fn generate_status() -> Result<String, Box<dyn std::error::Error>> {
     let current_window = active_window.unwrap_or(latest_window);
 
     // Build the formatted status line
-    build_status_line(current_window)
+    build_legacy_status_line(current_window)
 }
 
-/// Build the colorized status line from window data
-fn build_status_line(
+/// Build the colorized status line from window data (legacy version)
+#[allow(dead_code)]
+fn build_legacy_status_line(
     window: &crate::types::UsageWindow,
 ) -> Result<String, Box<dyn std::error::Error>> {
+    use crate::utils::{format_duration, format_token_count};
+    use chrono::{Duration, Utc};
+    
     // Estimate token limit (this should be configurable in the future)
     // Based on typical Claude usage limits - this is an approximation
     let estimated_limit = 28_000_000; // ~28M tokens per 5-hour window

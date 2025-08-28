@@ -1,5 +1,5 @@
 use crate::app_dirs::{ensure_app_dir_exists, get_config_file_path};
-use crate::claudebar_types::ConfigInfo;
+use crate::claudebar_types::{ConfigInfo, StatsFile};
 use std::fs;
 
 /// Initialize and load the configuration
@@ -51,4 +51,46 @@ pub fn save_config(config: &ConfigInfo) -> std::io::Result<()> {
         .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
     
     fs::write(config_path, json_content)
+}
+
+/// Get stats file path
+fn get_stats_file_path() -> std::path::PathBuf {
+    let config_dir = get_config_file_path().parent().unwrap().to_path_buf();
+    config_dir.join("stats.json")
+}
+
+/// Load stats file or create default
+pub fn load_stats() -> StatsFile {
+    let stats_path = get_stats_file_path();
+    
+    if stats_path.exists() {
+        match fs::read_to_string(&stats_path) {
+            Ok(content) => {
+                match serde_json::from_str::<StatsFile>(&content) {
+                    Ok(stats) => return stats,
+                    Err(_) => {
+                        // Stats file is corrupted, recreate it
+                        let default_stats = StatsFile::default();
+                        let _ = save_stats(&default_stats);
+                        return default_stats;
+                    }
+                }
+            }
+            Err(_) => {}
+        }
+    }
+    
+    // Stats file doesn't exist, create default
+    let default_stats = StatsFile::default();
+    let _ = save_stats(&default_stats);
+    default_stats
+}
+
+/// Save stats to file
+pub fn save_stats(stats: &StatsFile) -> std::io::Result<()> {
+    let stats_path = get_stats_file_path();
+    let json_content = serde_json::to_string_pretty(stats)
+        .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+    
+    fs::write(stats_path, json_content)
 }
