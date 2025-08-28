@@ -85,86 +85,109 @@ pub fn run(config: &rs_claude_bar::ConfigInfo, debug: bool, gaps: bool) {
         return;
     }
 
-    println!("🔍 Found {} usage blocks (analysis took {:.1}ms):", blocks.len(), analysis_duration.as_secs_f64() * 1000.0);
+    // Get last 10 fixed blocks (limit reached, not guessed)
+    let fixed_blocks: Vec<&UsageBlock> = blocks.iter()
+        .filter(|b| b.limit_reached && !b.guessed)
+        .collect();
+    
+    // Get current ongoing block (not limit reached, no end time)
+    let current_block = blocks.iter()
+        .find(|b| !b.limit_reached && b.end_time.is_none());
+
+    println!("🔍 Found {} fixed blocks, showing last 10 + current (analysis took {:.1}ms):", 
+             fixed_blocks.len(), 
+             analysis_duration.as_secs_f64() * 1000.0);
     println!();
     
-    // Show current session token count for active (ongoing) block
-    if let Some(current_block) = blocks.iter().find(|b| !b.limit_reached && b.end_time.is_none()) {
-        let total_tokens: u32 = current_block.entries.iter()
-            .map(|e| e.usage.total_tokens())
+    // Print table header for current block + last 10 fixed blocks
+    println!("{bold}┌──────┬─────────────┬─────────────┬──────────┬─────────┬────────────┬─────────┐{reset}",
+        bold = if should_use_colors() { BOLD } else { "" },
+        reset = if should_use_colors() { RESET } else { "" },
+    );
+    println!("{bold}│ Type │ Start       │ End         │ Duration │ Tokens  │ Messages   │ Status  │{reset}",
+        bold = if should_use_colors() { BOLD } else { "" },
+        reset = if should_use_colors() { RESET } else { "" },
+    );
+    println!("{bold}├──────┼─────────────┼─────────────┼──────────┼─────────┼────────────┼─────────┤{reset}",
+        bold = if should_use_colors() { BOLD } else { "" },
+        reset = if should_use_colors() { RESET } else { "" },
+    );
+
+    // Show current session estimate first
+    if let Some(current) = current_block {
+        let total_tokens: u32 = current.entries.iter()
+            .map(|e| e.usage.output_tokens)
             .sum();
-        let session_duration = chrono::Utc::now() - current_block.start_time;
+        let session_duration = chrono::Utc::now() - current.start_time;
         let duration_str = format_duration_hours(session_duration);
         
-        println!("🚨 CURRENT SESSION: {} tokens used in {} (started {})", 
-                 total_tokens,
-                 duration_str,
-                 current_block.start_time.format("%H:%M"));
+        // Calculate estimated end time (5 hours from start)
+        let estimated_end = current.start_time + Duration::hours(5);
+        let time_remaining = estimated_end - chrono::Utc::now();
+        let remaining_str = if time_remaining.num_seconds() > 0 {
+            format!("{} left", format_duration_hours(time_remaining))
+        } else {
+            "overtime".to_string()
+        };
         
-        // Rough estimate of limit approach (typical limit ~25-30k tokens per 5h window)
         let est_limit = 25000;
         let percentage = (total_tokens as f64 / est_limit as f64) * 100.0;
-        if percentage > 70.0 {
-            println!("⚠️  APPROACHING LIMIT: ~{:.0}% of estimated window limit", percentage);
-        }
-        println!();
+        let status = if percentage > 70.0 {
+            format!("{yellow}⚠️ {:.0}%{reset}", percentage, yellow = YELLOW, reset = RESET)
+        } else {
+            format!("{green}🟢 {:.0}%{reset}", percentage, green = GREEN, reset = RESET)
+        };
+
+        println!("│ {:<4} │ {:<11} │ {:<11} │ {:<8} │ {:<7} │ {:<10} │ {:<7} │",
+            "NOW",
+            current.start_time.format("%m-%d %H:%M"),
+            remaining_str,
+            duration_str,
+            total_tokens,
+            current.assistant_count,
+            if should_use_colors() { &status } else { &format!("{:.0}%", percentage) }
+        );
     }
 
-    // Display blocks
-    for (i, block) in blocks.iter().enumerate() {
-        let limit_indicator = if block.limit_reached {
-            format!("{red}🔴 LIMIT HIT{reset}", red = RED, reset = RESET)
-        } else {
-            format!("{green}🟢 ACTIVE{reset}", green = GREEN, reset = RESET)
-        };
-        let status = if block.guessed {
-            format!("{} (guess)", limit_indicator)
-        } else {
-            limit_indicator
-        };
-
-        let end_display = block
-            .end_time
-            .map(|t| t.format("%Y-%m-%d %H:%M UTC").to_string())
-            .unwrap_or_else(|| "ongoing".to_string());
-
+    // Display last 10 fixed blocks (newest first, so reverse the reverse)  
+    let mut display_blocks: Vec<&UsageBlock> = fixed_blocks.iter().rev().take(10).map(|&b| b).collect();
+    display_blocks.reverse();
+    
+    for block in display_blocks.iter() {
         let duration = block
             .end_time
             .unwrap_or_else(Utc::now)
             .signed_duration_since(block.start_time);
         let duration_str = format_duration_hours(duration);
 
-        println!(
-            "Block {}: {} - {}",
-            i + 1,
-            block.start_time.format("%Y-%m-%d %H:%M UTC"),
-            end_display
-        );
-        println!(
-            "  Duration: {} | Assistant messages: {} | Status: {}",
-            duration_str, block.assistant_count, status
-        );
+        let total_tokens: u32 = block.entries.iter()
+            .map(|e| e.usage.output_tokens)
+            .sum();
 
-        // Show reset time and unlock time for limit-reached blocks
-        if block.limit_reached {
-            if let Some(reset_time) = &block.reset_time {
-                print!("  Reset time: {}", reset_time);
-                if let Some(unlock_time) = &block.unlock_time {
-                    println!(
-                        " | Unlocks at: {}",
-                        unlock_time.format("%Y-%m-%d %H:%M UTC")
-                    );
-                } else {
-                    println!(" | Unlock time: could not calculate");
-                }
-            } else {
-                println!("  Reset time: not found in limit message");
-            }
-        }
+        let end_display = block
+            .end_time
+            .map(|t| t.format("%m-%d %H:%M").to_string())
+            .unwrap_or_else(|| "ongoing".to_string());
 
-        println!("  Total entries: {}", block.entries.len());
-        println!();
+        let reset_time = block.reset_time.as_deref().unwrap_or("?");
+        
+        let status = format!("{red}🔴 {}{reset}", reset_time, red = RED, reset = RESET);
+
+        println!("│ {:<4} │ {:<11} │ {:<11} │ {:<8} │ {:<7} │ {:<10} │ {:<7} │",
+            "PAST",
+            block.start_time.format("%m-%d %H:%M"),
+            end_display,
+            duration_str,
+            total_tokens,
+            block.assistant_count,
+            if should_use_colors() { &status } else { reset_time }
+        );
     }
+
+    println!("{bold}└──────┴─────────────┴─────────────┴──────────┴─────────┴────────────┴─────────┘{reset}",
+        bold = if should_use_colors() { BOLD } else { "" },
+        reset = if should_use_colors() { RESET } else { "" },
+    );
     
     // Update config with the latest block date for next run
     // This needs to be implemented differently as we're not using CurrentBlock here
@@ -459,15 +482,15 @@ fn print_blocks_debug(blocks: &[UsageBlock], all_entries: &[ClaudeBarUsageEntry]
     }
 
     // Print table header
-    println!("{bold}┌─────────────────────┬─────────────────────┬─────────┬─────────────────────┬─────────────────────┬────────┐{reset}",
+    println!("{bold}┌────────────────┬────────────────┬─────────┬────────────────┬────────────────┬───────┬───────────┐{reset}",
         bold = if should_use_colors() { BOLD } else { "" },
         reset = if should_use_colors() { RESET } else { "" },
     );
-    println!("{bold}│ FIXED Window Start  │ FIXED Window End    │ Reset   │ First Activity      │ Last Activity       │ Count  │{reset}",
+    println!("{bold}│   Window Start │     Window End │   Reset │ First Activity │  Last Activity │ Count │    Tokens │{reset}",
         bold = if should_use_colors() { BOLD } else { "" },
         reset = if should_use_colors() { RESET } else { "" },
     );
-    println!("{bold}├─────────────────────┼─────────────────────┼─────────┼─────────────────────┼─────────────────────┼────────┤{reset}",
+    println!("{bold}├────────────────┼────────────────┼─────────┼────────────────┼────────────────┼───────┼───────────┤{reset}",
         bold = if should_use_colors() { BOLD } else { "" },
         reset = if should_use_colors() { RESET } else { "" },
     );
@@ -493,18 +516,25 @@ fn print_blocks_debug(blocks: &[UsageBlock], all_entries: &[ClaudeBarUsageEntry]
 
         let reset_time = block.reset_time.as_deref().unwrap_or("Unknown");
         let count = activity_entries.len();
+        let total_tokens: u32 = activity_entries.iter()
+            .map(|e| e.usage.output_tokens)
+            .sum();
 
-        println!("│ {:<19} │ {:<19} │ {:<7} │ {:<19} │ {:<19} │ {:<6} │",
+        // Format tokens with thousands separators
+        let tokens_formatted = format_number_with_separators(total_tokens);
+
+        println!("│ {:>14} │ {:>14} │ {:>7} │ {:>14} │ {:>14} │ {:>5} │ {:>9} │",
             block.start_time.format("%m-%d %H:%M"),
             block.end_time.unwrap().format("%m-%d %H:%M"),
             reset_time,
             first_activity,
             last_activity,
-            count
+            count,
+            tokens_formatted
         );
     }
 
-    println!("{bold}└─────────────────────┴─────────────────────┴─────────┴─────────────────────┴─────────────────────┴────────┘{reset}",
+    println!("{bold}└────────────────┴────────────────┴─────────┴────────────────┴────────────────┴───────┴───────────┘{reset}",
         bold = if should_use_colors() { BOLD } else { "" },
         reset = if should_use_colors() { RESET } else { "" },
     );
@@ -603,6 +633,22 @@ fn format_duration_hours(duration: Duration) -> String {
     } else {
         format!("{}h {}m", total_hours, minutes)
     }
+}
+
+/// Format a number with thousands separators (e.g., 1,234,567)
+fn format_number_with_separators(num: u32) -> String {
+    let num_str = num.to_string();
+    let mut result = String::new();
+    let chars: Vec<char> = num_str.chars().collect();
+    
+    for (i, ch) in chars.iter().enumerate() {
+        if i > 0 && (chars.len() - i) % 3 == 0 {
+            result.push(',');
+        }
+        result.push(*ch);
+    }
+    
+    result
 }
 
 #[cfg(test)]
