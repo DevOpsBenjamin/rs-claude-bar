@@ -1,7 +1,8 @@
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 
 /// Represents a single usage entry from Claude Code logs
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UsageEntry {
     pub timestamp: DateTime<Utc>,
     pub session_id: String,
@@ -16,7 +17,7 @@ pub struct UsageEntry {
 }
 
 /// Represents a 5-hour usage window
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UsageWindow {
     pub start_time: DateTime<Utc>,
     pub end_time: DateTime<Utc>,
@@ -44,6 +45,12 @@ impl UsageEntry {
     }
 }
 
+impl Default for UsageEntry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl UsageWindow {
     pub fn new(start_time: DateTime<Utc>) -> Self {
         Self {
@@ -57,3 +64,5 @@ impl UsageWindow {
         }
     }
 }
+
+

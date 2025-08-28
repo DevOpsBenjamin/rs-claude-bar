@@ -1,0 +1,10 @@
+{
+  "display": [
+    { "name": "context_window_size", "enabled": true, "format": "progress" },
+    { "name": "context_max_tokens", "enabled": true, "format": "number" },
+    { "name": "current_tokens", "enabled": true, "format": "number/max" },
+    { "name": "max_tokens", "enabled": true, "format": "number" },
+    { "name": "refresh_time", "enabled": true, "format": "relative" },
+    { "name": "session_time", "enabled": true, "format": "relative" }
+  ]
+}

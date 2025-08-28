@@ -1,17 +1,18 @@
 use std::env;
 
 // ANSI color and formatting codes - match bash script exactly
-pub const RED: &str = "\033[0;31m";
-pub const GREEN: &str = "\033[0;32m";
-pub const YELLOW: &str = "\033[1;33m";
-pub const BLUE: &str = "\033[0;34m";
-pub const PURPLE: &str = "\033[0;35m";
-pub const CYAN: &str = "\033[0;36m";
-pub const WHITE: &str = "\033[1;37m";
-pub const GRAY: &str = "\033[0;37m";  // Use same gray as bash script
-pub const DEFAULT: &str = "\033[39m"; // Default foreground color
-pub const RESET: &str = "\033[0m";
-pub const BOLD: &str = "\033[1m";
+// Use explicit escape character (\x1b) so the terminal interprets colors properly
+pub const RED: &str = "\x1b[0;31m";
+pub const GREEN: &str = "\x1b[0;32m";
+pub const YELLOW: &str = "\x1b[1;33m";
+pub const BLUE: &str = "\x1b[0;34m";
+pub const PURPLE: &str = "\x1b[0;35m";
+pub const CYAN: &str = "\x1b[0;36m";
+pub const WHITE: &str = "\x1b[1;37m";
+pub const GRAY: &str = "\x1b[0;37m";  // Use same gray as bash script
+pub const DEFAULT: &str = "\x1b[39m"; // Default foreground color
+pub const RESET: &str = "\x1b[0m";
+pub const BOLD: &str = "\x1b[1m";
 
 /// Check if the terminal supports colors
 pub fn should_use_colors() -> bool {
@@ -19,6 +20,12 @@ pub fn should_use_colors() -> bool {
     // since Claude Code displays the output in a terminal context
     env::var("NO_COLOR").is_err() && 
     env::var("TERM").map(|t| t != "dumb").unwrap_or(true)
+}
+
+/// Always use colors for Claude Code status line (assumes Claude Code supports ANSI)
+pub fn should_use_colors_for_status() -> bool {
+    // Claude Code always supports ANSI colors, so only respect NO_COLOR
+    env::var("NO_COLOR").is_err()
 }
 
 /// Apply color to text if colors are supported

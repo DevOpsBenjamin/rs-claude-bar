@@ -1,17 +1,32 @@
-use rs_claude_bar::{generate_claude_status, debug_output};
-use std::env;
+mod cli;
+mod commands;
+
+use clap::Parser;
+use cli::{Cli, Commands};
 
 fn main() {
-    let args: Vec<String> = env::args().collect();
-    
-    // Check for debug flag (Rust standard convention)
-    if args.len() > 1 && args[1] == "--debug" {
-        print!("{}", debug_output());
-        return;
-    }
-    
-    match generate_claude_status() {
-        Ok(status) => print!("{}", status),
-        Err(e) => print!("🤖 Claude Code | ❌ Error: {}", e),
+    // Initialize configuration (creates folder and file if needed)
+    let config = rs_claude_bar::initialize_config();
+
+    // Parse CLI first to see if we have a specific command
+    let cli = Cli::parse();
+
+    // Claude input parsing is now handled in the status command itself
+
+    // Execute the command  
+    match cli.command.unwrap_or(Commands::Info) {
+        Commands::Info => commands::info::run(&config),
+        Commands::Manual => commands::help::run(&config),
+        Commands::Prompt => commands::prompt::run(&config),
+        Commands::Update => commands::update::run(&config),
+        Commands::History => commands::history::run(&config),
+        Commands::Stats => commands::stats::run(&config),
+        Commands::DisplayConfig => commands::display_config::run(&config),
+        Commands::Debug { parse, file, blocks, gaps, limits } => commands::debug::run(&config, parse, file, blocks, gaps, limits),
+        Commands::Table => commands::table::run(&config),
+        Commands::Blocks { debug, gaps, limits } => commands::blocks::run(&config, debug, gaps, limits),
+        Commands::Resets => commands::resets::run(&config),
+        Commands::Install => commands::install::run(&config),
+        Commands::Config { command } => commands::config::run(command, &config),
     }
 }

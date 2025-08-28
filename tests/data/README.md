@@ -1,0 +1,1 @@
+Some file for test funky point the rs-claude big file is the begining of the project
