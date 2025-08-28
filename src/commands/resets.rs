@@ -1,9 +1,13 @@
 use chrono::{DateTime, Duration, Utc};
 use chrono::TimeZone;
 use rs_claude_bar::{
-    claude_types::TranscriptEntry,
-    claudebar_types::{AssistantInfo, CurrentBlock, GuessBlock, UserInfo, ClaudeBarUsageEntry, UserRole},
-    analyze::{load_all_entries, parse_reset_time, calculate_unlock_time},
+    claudebar_types::{CurrentBlock, GuessBlock, ClaudeBarUsageEntry},
+    analyze::{
+        load_all_entries,
+        build_guess_blocks_from_entries,
+        build_current_blocks_from_guess,
+        aggregate_events_into_blocks,
+    },
 };
 use std::collections::HashSet;
 use std::fs;
@@ -21,123 +25,40 @@ pub fn run(config: &rs_claude_bar::ConfigInfo) {
         return;
     }
 
-    let mut limit_entries: Vec<ClaudeBarUsageEntry> = Vec::new();
-
-    if let Ok(entries) = fs::read_dir(path) {
-        for entry in entries.flatten() {
-            if entry.path().is_dir() {
-                let folder_name = entry.file_name().to_string_lossy().to_string();
-
-                if let Ok(files) = fs::read_dir(entry.path()) {
-                    for file in files.flatten() {
-                        if file.path().extension().and_then(|s| s.to_str()) == Some("jsonl") {
-                            let file_name = file.file_name().to_string_lossy().to_string();
-
-                            // file modification date (optional)
-                            let file_date = file
-                                .metadata()
-                                .ok()
-                                .and_then(|meta| meta.modified().ok())
-                                .map(DateTime::<Utc>::from);
-
-                            if let Ok(content) = fs::read_to_string(file.path()) {
-                                for line in content.lines() {
-                                    let line = line.trim();
-                                    if line.is_empty() {
-                                        continue;
-                                    }
-                                    // Fast path: only consider lines that likely contain limit text
-                                    if !line.contains("5-hour limit reached") {
-                                        continue;
-                                    }
-                                    if let Ok(transcript) = serde_json::from_str::<TranscriptEntry>(line) {
-                                        let entry = ClaudeBarUsageEntry::from_transcript(
-                                            &transcript,
-                                            folder_name.clone(),
-                                            file_name.clone(),
-                                            file_date,
-                                        );
-                                        if entry.is_limit_reached {
-                                            limit_entries.push(entry);
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
+    // Use shared loader to get all entries and then filter limit ones
+    let mut all_entries = load_all_entries(&base_path);
+    let limit_entries: Vec<ClaudeBarUsageEntry> = all_entries
+        .iter()
+        .cloned()
+        .filter(|e| e.is_limit_reached)
+        .collect();
 
     if limit_entries.is_empty() {
         println!("No limit messages found.");
         return;
     }
 
-    // Sort by timestamp descending (most recent first)
-    limit_entries.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
-
-    // Build blocks from entries
-    let mut blocks: Vec<GuessBlock> = Vec::new();
-    for e in limit_entries.into_iter() {
-        let ts = e.timestamp;
-        let content = e.content_text.as_deref().unwrap_or("");
-        if let Some(reset_time) = parse_reset_time(content) {
-            if let Some(unlock) = calculate_unlock_time(ts, &reset_time) {
-                let start = unlock - Duration::hours(5);
-                blocks.push(GuessBlock {
-                    msg_timestamp: ts,
-                    reset: reset_time,
-                    end: unlock,
-                    start,
-                });
-            }
-        }
-    }
-
-    // Deduplicate by timing (start,end) to remove retries before limit end
-    let mut seen: HashSet<(i64, i64)> = HashSet::new();
-    let mut unique: Vec<GuessBlock> = Vec::new();
-    for b in blocks.into_iter() {
-        let key = (b.start.timestamp(), b.end.timestamp());
-        if seen.insert(key) {
-            unique.push(b);
-        }
-    }
-
-    // Keep newest first by end time
-    unique.sort_by(|a, b| b.end.cmp(&a.end));
-
-    // Add one real projected block from latest end -> +5h
-    if let Some(latest) = unique.first().cloned() {
-        let start = latest.end;
-        let end = start + Duration::hours(5);
-        let projected = GuessBlock {
-            msg_timestamp: start,
-            reset: "projected".to_string(),
-            start,
-            end,
-        };
-        // Insert as newest (front)
-        if unique.first().map(|b| b.start != start || b.end != end).unwrap_or(true) {
-            unique.insert(0, projected);
-        }
-    }
+    // Build GuessBlocks via shared helper (handles dedup, sort, projected block)
+    let guess_blocks: Vec<GuessBlock> = build_guess_blocks_from_entries(&limit_entries);
 
     // Print GuessBlocks via debug print (readable)
-    print_guessblocks_debug(&unique);
+    print_guessblocks_debug(&guess_blocks);
 
     // Build CurrentBlocks: one per guess block, plus gaps
-    let mut current_blocks = build_current_blocks(&unique);
+    let mut current_blocks: Vec<CurrentBlock> = build_current_blocks_from_guess(&guess_blocks, Utc::now());
 
-    // Load all events and aggregate into blocks (shared helper)
-    let mut all = load_all_entries(&base_path);
-    all.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
-    aggregate_events_into_blocks(&mut current_blocks, &unique, &all);
+    // Aggregate all events into blocks
+    all_entries.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
+    aggregate_events_into_blocks(&mut current_blocks, &guess_blocks, &all_entries);
+
+    // Remove blocks with zero totals (no assistant tokens and no user content and no assistant content)
+    let filtered: Vec<CurrentBlock> = current_blocks
+        .into_iter()
+        .filter(|b| b.assistant.total_tokens > 0 || b.assistant.content > 0 || b.user.content > 0)
+        .collect();
 
     // Print CurrentBlocks via debug print (readable)
-    print_currentblocks_debug(&current_blocks);
+    print_currentblocks_debug(&filtered);
 }
 
 
