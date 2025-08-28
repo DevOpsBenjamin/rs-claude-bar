@@ -9,18 +9,20 @@ pub mod status;
 pub mod types;
 pub mod utils;
 pub mod analyze;
+pub mod display;
 
 pub use app_dirs::*;
 pub use claude_types::*;
 pub use claudebar_types::*;
 pub use colors::*;
-pub use config::{load_config, reset_config_interactive, DisplayItem, Config};
+pub use config::{load_config, reset_config_interactive, Config};
 pub use config_manager::*;
 pub use parser::*;
-pub use status::*;
+pub use status::{generate_status, generate_status_with_config, generate_status_with_config_and_model};
 pub use types::*;
 pub use utils::*;
 pub use analyze::*;
+pub use display::*;
 
 pub fn generate_claude_status() -> Result<String, Box<dyn std::error::Error>> {
     status::generate_status()

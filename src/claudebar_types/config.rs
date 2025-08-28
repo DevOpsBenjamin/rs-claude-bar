@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
 use std::env;
+use crate::display::{DisplayItem, StatType, DisplayFormat};
 
 /// Simple block for stats storage
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -43,11 +44,11 @@ pub struct DisplayConfig {
     /// Whether to use colored output
     pub use_colors: bool,
     
-    /// Whether to show progress bars
-    pub show_progress_bars: bool,
+    /// List of display items with their configuration
+    pub items: Vec<DisplayItem>,
     
-    /// Compact display mode
-    pub compact_mode: bool,
+    /// Separator between status items
+    pub separator: String,
 }
 
 impl Default for ConfigInfo {
@@ -69,8 +70,15 @@ impl Default for DisplayConfig {
     fn default() -> Self {
         Self {
             use_colors: true,
-            show_progress_bars: true,
-            compact_mode: false,
+            items: vec![
+                DisplayItem::new(StatType::TokenUsage, DisplayFormat::TextWithEmoji),
+                DisplayItem::new(StatType::TokenPercentage, DisplayFormat::Ratio),
+                DisplayItem::new(StatType::BlockStatus, DisplayFormat::StatusIcon),
+                DisplayItem::new(StatType::MessageCount, DisplayFormat::TextWithEmoji),
+                DisplayItem::new(StatType::TimeRemaining, DisplayFormat::TextWithEmoji),
+                DisplayItem::new(StatType::Model, DisplayFormat::TextWithEmoji),
+            ],
+            separator: " | ".to_string(),
         }
     }
 }

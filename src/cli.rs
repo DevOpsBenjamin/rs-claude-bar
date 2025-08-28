@@ -28,8 +28,6 @@ pub enum Commands {
     Blocks,
     /// List only limit messages with [end, end-5h]
     Resets,
-    /// Show detailed help and usage examples
-    Help,
     /// Manage configuration settings
     Config {
         #[command(subcommand)]
@@ -39,9 +37,10 @@ pub enum Commands {
 
 #[derive(Subcommand, Clone)]
 pub enum ConfigCommands {
-    /// Display help for configuration commands
-    Help,
     /// Configure Claude data path
     #[command(name = "claude-path")]
     ClaudePath,
+    /// Configure display settings
+    #[command(name = "display")]
+    Display,
 }

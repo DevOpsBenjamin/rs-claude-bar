@@ -22,6 +22,12 @@ pub fn should_use_colors() -> bool {
     env::var("TERM").map(|t| t != "dumb").unwrap_or(true)
 }
 
+/// Always use colors for Claude Code status line (assumes Claude Code supports ANSI)
+pub fn should_use_colors_for_status() -> bool {
+    // Claude Code always supports ANSI colors, so only respect NO_COLOR
+    env::var("NO_COLOR").is_err()
+}
+
 /// Apply color to text if colors are supported
 pub fn colorize(text: &str, color: &str) -> String {
     if should_use_colors() {

@@ -1,4 +1,4 @@
-use chrono::{Utc, Duration};
+use chrono::{Utc, Duration, DateTime, Timelike};
 use rs_claude_bar::{
     claudebar_types::{GuessBlock, ClaudeBarUsageEntry, SimpleBlock, StatsFile},
     analyze::{
@@ -11,8 +11,55 @@ use rs_claude_bar::{
 };
 use std::path::Path;
 
+/// Round a timestamp to the current hour boundary (00:00 minutes/seconds)
+fn round_to_hour_boundary(dt: DateTime<Utc>) -> DateTime<Utc> {
+    dt.date_naive()
+        .and_hms_opt(dt.hour(), 0, 0)
+        .unwrap()
+        .and_utc()
+}
+
 // Read JSONL files, find only limit-reached entries, and print simple list lines:
 // "<end UTC> | <start UTC>" where start = end - 5h
+
+/// Silent version of run() for status command auto-refresh
+pub fn refresh_stats_for_status(config: &rs_claude_bar::ConfigInfo) {
+    let base_path = format!("{}/projects", config.claude_data_path);
+    let path = Path::new(&base_path);
+    if !path.exists() {
+        return;
+    }
+    
+    let mut stats = load_stats();
+    let now = Utc::now();
+    
+    // Load entries since last processed time  
+    let since_time = stats.last_processed.unwrap_or_else(|| now - Duration::days(7));
+    let all_entries = load_entries_since(&base_path, Some(since_time));
+    
+    if all_entries.is_empty() {
+        return;
+    }
+    
+    // Reset current block tokens to avoid double-counting, then rebuild from ALL entries in this block
+    if let Some(current) = &mut stats.current {
+        current.tokens = 0;
+    }
+    for past in &mut stats.past {
+        past.tokens = 0;
+    }
+    
+    // Process ALL entries for the current day to get accurate count  
+    let today_start = now.date_naive().and_hms_opt(0, 0, 0).unwrap().and_utc();
+    let all_today_entries = load_entries_since(&base_path, Some(today_start));
+    
+    // Update stats with blocks and token counts
+    update_block_tokens(&mut stats, &all_today_entries);
+    stats.last_processed = Some(now);
+    
+    // Save silently
+    let _ = save_stats(&stats);
+}
 
 pub fn run(config: &rs_claude_bar::ConfigInfo) {
     let base_path = format!("{}/projects", config.claude_data_path);
@@ -85,9 +132,9 @@ pub fn run(config: &rs_claude_bar::ConfigInfo) {
     // Update current block based on block status and now time
     match block_status {
         BlockStatus::NoCurrentBlock => {
-            // Create new current block starting from now
-            let current_start = now;
-            let current_end = now + Duration::hours(5);
+            // Create new current block starting from the current hour boundary
+            let current_start = round_to_hour_boundary(now);
+            let current_end = current_start + Duration::hours(5);
             stats.current = Some(SimpleBlock {
                 start: current_start,
                 end: current_end,
