@@ -237,9 +237,6 @@ fn aggregate_events_into_blocks(blocks: &mut Vec<CurrentBlock>, guess: &Vec<Gues
         return;
     }
 
-    // Convenience to find if ts is inside guess block i
-    let in_guess = |i: usize, ts: DateTime<Utc>| ts >= guess[i].start && ts <= guess[i].end;
-
     // Iterate events in descending time and place them
     for e in all.iter() {
         let ts = e.timestamp;
@@ -307,7 +304,7 @@ fn update_block(block: &mut CurrentBlock, e: &ClaudeBarUsageEntry) {
 
 fn print_currentblocks_table(blocks: &Vec<CurrentBlock>) {
     println!("type|reset|start|end|min|max|assistant_content|assistant_in|assistant_out|assistant_cache_create|assistant_cache_read|assistant_total|user_content");
-    for (i, b) in blocks.iter().enumerate() {
+    for b in blocks.iter() {
         let t = if b.start.is_some() && b.end.is_some() { "block" } else { "gap" };
         let start = b.start.map(|d| d.format("%Y-%m-%d %H:%M UTC").to_string()).unwrap_or_default();
         let end = b.end.map(|d| d.format("%Y-%m-%d %H:%M UTC").to_string()).unwrap_or_default();
@@ -331,4 +328,47 @@ fn print_currentblocks_table(blocks: &Vec<CurrentBlock>) {
             b.user.content,
         );
     }
+}
+
+// Local reader to get every entry from ~/.claude/projects as ClaudeBarUsageEntry
+fn load_all_entries(base_path: &str) -> Vec<ClaudeBarUsageEntry> {
+    let mut usage_entries = Vec::new();
+    let projects = Path::new(base_path);
+    if !projects.exists() { return usage_entries; }
+
+    if let Ok(entries) = fs::read_dir(projects) {
+        for entry in entries.flatten() {
+            if entry.path().is_dir() {
+                let folder_name = entry.file_name().to_string_lossy().to_string();
+                if let Ok(files) = fs::read_dir(entry.path()) {
+                    for file in files.flatten() {
+                        if file.path().extension().and_then(|s| s.to_str()) == Some("jsonl") {
+                            let file_name = file.file_name().to_string_lossy().to_string();
+                            let file_date = file
+                                .metadata()
+                                .ok()
+                                .and_then(|m| m.modified().ok())
+                                .map(DateTime::<Utc>::from);
+                            if let Ok(content) = fs::read_to_string(file.path()) {
+                                for line in content.lines() {
+                                    let line = line.trim();
+                                    if line.is_empty() { continue; }
+                                    if let Ok(transcript) = serde_json::from_str::<TranscriptEntry>(line) {
+                                        let entry = ClaudeBarUsageEntry::from_transcript(
+                                            &transcript,
+                                            folder_name.clone(),
+                                            file_name.clone(),
+                                            file_date,
+                                        );
+                                        usage_entries.push(entry);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    usage_entries
 }
