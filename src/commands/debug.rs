@@ -1,5 +1,5 @@
 use chrono::{DateTime, Utc};
-use rs_claude_bar::claude_types::TranscriptEntry;
+use rs_claude_bar::claude_types::{TranscriptEntry, Entry};
 use rs_claude_bar::colors::*;
 use std::fs;
 use std::path::Path;
@@ -98,23 +98,25 @@ fn parse_file_content(content: &str) -> FileParseStats {
             continue;
         }
 
-        match serde_json::from_str::<TranscriptEntry>(line) {
+        match serde_json::from_str::<Entry>(line) {
             Ok(entry) => {
                 stats.successful_parses += 1;
                 
-                // Parse timestamp and update bounds
-                if let Ok(timestamp) = DateTime::parse_from_rfc3339(&entry.timestamp) {
-                    let timestamp_utc = timestamp.with_timezone(&Utc);
-                    if stats.min_timestamp.is_none() || timestamp_utc < stats.min_timestamp.unwrap() {
-                        stats.min_timestamp = Some(timestamp_utc);
-                    }
-                    if stats.max_timestamp.is_none() || timestamp_utc > stats.max_timestamp.unwrap() {
-                        stats.max_timestamp = Some(timestamp_utc);
+                // Parse timestamp and update bounds if available
+                if let Some(timestamp_str) = entry.timestamp() {
+                    if let Ok(timestamp) = DateTime::parse_from_rfc3339(timestamp_str) {
+                        let timestamp_utc = timestamp.with_timezone(&Utc);
+                        if stats.min_timestamp.is_none() || timestamp_utc < stats.min_timestamp.unwrap() {
+                            stats.min_timestamp = Some(timestamp_utc);
+                        }
+                        if stats.max_timestamp.is_none() || timestamp_utc > stats.max_timestamp.unwrap() {
+                            stats.max_timestamp = Some(timestamp_utc);
+                        }
                     }
                 }
 
                 // Add output tokens if available
-                if let Some(ref usage) = entry.message.usage {
+                if let Some(usage) = entry.usage() {
                     stats.total_output_tokens += usage.output_tokens;
                 }
             }
@@ -359,23 +361,25 @@ fn analyze_single_file_with_errors(content: &str, file_path: &str) {
             continue;
         }
 
-        match serde_json::from_str::<TranscriptEntry>(line) {
+        match serde_json::from_str::<Entry>(line) {
             Ok(entry) => {
                 stats.successful_parses += 1;
                 
-                // Parse timestamp and update bounds
-                if let Ok(timestamp) = DateTime::parse_from_rfc3339(&entry.timestamp) {
-                    let timestamp_utc = timestamp.with_timezone(&Utc);
-                    if stats.min_timestamp.is_none() || timestamp_utc < stats.min_timestamp.unwrap() {
-                        stats.min_timestamp = Some(timestamp_utc);
-                    }
-                    if stats.max_timestamp.is_none() || timestamp_utc > stats.max_timestamp.unwrap() {
-                        stats.max_timestamp = Some(timestamp_utc);
+                // Parse timestamp and update bounds if available
+                if let Some(timestamp_str) = entry.timestamp() {
+                    if let Ok(timestamp) = DateTime::parse_from_rfc3339(timestamp_str) {
+                        let timestamp_utc = timestamp.with_timezone(&Utc);
+                        if stats.min_timestamp.is_none() || timestamp_utc < stats.min_timestamp.unwrap() {
+                            stats.min_timestamp = Some(timestamp_utc);
+                        }
+                        if stats.max_timestamp.is_none() || timestamp_utc > stats.max_timestamp.unwrap() {
+                            stats.max_timestamp = Some(timestamp_utc);
+                        }
                     }
                 }
 
                 // Add output tokens if available
-                if let Some(ref usage) = entry.message.usage {
+                if let Some(usage) = entry.usage() {
                     stats.total_output_tokens += usage.output_tokens;
                 }
             }

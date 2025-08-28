@@ -18,9 +18,11 @@ pub struct TranscriptMessage {
     pub role: Option<String>,
     
     /// Why the message stopped (stop_sequence, max_tokens, etc.)
+    #[serde(default)]
     pub stop_reason: Option<String>,
     
     /// The actual stop sequence used
+    #[serde(default)]
     pub stop_sequence: Option<String>,
     
     /// Message type

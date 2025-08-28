@@ -1,6 +1,56 @@
 use serde::{Deserialize, Serialize};
 use super::message::TranscriptMessage;
 
+/// Union type for different entry types in JSONL files
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum Entry {
+    /// Session summary entries (simpler structure)
+    Summary {
+        #[serde(rename = "type")]
+        entry_type: String, // Should be "summary"
+        summary: String,
+        #[serde(rename = "leafUuid")]
+        leaf_uuid: String,
+    },
+    /// Regular transcript entries (more complex structure)
+    Transcript(TranscriptEntry),
+    /// Fallback for any other JSON structure
+    Unknown(serde_json::Value),
+}
+
+impl Entry {
+    /// Get the timestamp if available
+    pub fn timestamp(&self) -> Option<&str> {
+        match self {
+            Entry::Transcript(entry) => Some(&entry.timestamp),
+            Entry::Summary { .. } => None,
+            Entry::Unknown(value) => {
+                // Try to extract timestamp from unknown entry
+                value.get("timestamp").and_then(|v| v.as_str())
+            }
+        }
+    }
+    
+    /// Check if this entry has usage information
+    pub fn has_usage(&self) -> bool {
+        match self {
+            Entry::Transcript(entry) => entry.message.usage.is_some(),
+            Entry::Summary { .. } => false,
+            Entry::Unknown(_) => false,
+        }
+    }
+    
+    /// Get usage if available
+    pub fn usage(&self) -> Option<&super::usage::MessageUsage> {
+        match self {
+            Entry::Transcript(entry) => entry.message.usage.as_ref(),
+            Entry::Summary { .. } => None,
+            Entry::Unknown(_) => None,
+        }
+    }
+}
+
 /// Full Claude Code transcript entry - the top-level structure in JSONL files
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TranscriptEntry {
@@ -54,4 +104,12 @@ pub struct TranscriptEntry {
     /// Cost in USD (may be missing in some entries)
     #[serde(rename = "costUSD", default)]
     pub cost_usd: Option<f64>,
+    
+    /// Tool use result information (may be missing in some entries)
+    #[serde(rename = "toolUseResult", default)]
+    pub tool_use_result: Option<serde_json::Value>,
+    
+    /// Request ID (may be missing in some entries)
+    #[serde(rename = "requestId", default)]
+    pub request_id: Option<String>,
 }
