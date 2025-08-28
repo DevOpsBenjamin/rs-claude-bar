@@ -118,7 +118,9 @@ pub fn load_claude_data() -> Result<Vec<UsageEntry>, Box<dyn std::error::Error>>
 }
 
 /// Load JSONL entries from specific path
-pub fn load_claude_data_from_path(data_path: &str) -> Result<Vec<UsageEntry>, Box<dyn std::error::Error>> {
+pub fn load_claude_data_from_path(
+    data_path: &str,
+) -> Result<Vec<UsageEntry>, Box<dyn std::error::Error>> {
     let claude_dir = Path::new(data_path);
 
     if !claude_dir.exists() {
@@ -130,14 +132,14 @@ pub fn load_claude_data_from_path(data_path: &str) -> Result<Vec<UsageEntry>, Bo
     let mut _total_files = 0;
     let mut _parse_errors = 0;
 
-    if let Ok(entries) = fs::read_dir(&claude_dir) {
+    if let Ok(entries) = fs::read_dir(claude_dir) {
         for entry in entries.flatten() {
             if let Ok(project_entries) = fs::read_dir(entry.path()) {
                 for file in project_entries.flatten() {
                     if file.path().extension().and_then(|s| s.to_str()) == Some("jsonl") {
                         _total_files += 1;
                         if let Ok(content) = fs::read_to_string(file.path()) {
-                            for (_line_num, line) in content.lines().enumerate() {
+                            for line in content.lines() {
                                 if line.trim().is_empty() {
                                     continue;
                                 }

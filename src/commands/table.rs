@@ -109,8 +109,8 @@ pub fn run(config: &rs_claude_bar::ConfigInfo) {
         return;
     }
 
-    // Sort by timestamp
-    usage_entries.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
+    // Sort by timestamp (most recent first)
+    usage_entries.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
 
     // Project grouping statistics (before moving usage_entries)
     let project_stats = group_by_project(&usage_entries);
