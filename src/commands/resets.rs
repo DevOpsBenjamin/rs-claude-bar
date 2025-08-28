@@ -1,4 +1,4 @@
-use chrono::{Utc, DateTime};
+use chrono::{Utc, DateTime, Timelike, Duration};
 use rs_claude_bar::{
     claudebar_types::{CurrentBlock, GuessBlock, ClaudeBarUsageEntry},
     analyze::{
@@ -65,26 +65,96 @@ pub fn run(config: &rs_claude_bar::ConfigInfo) {
     print_currentblocks_debug(&filtered_debug);
 
     // Build a simple array of non-gap blocks: start, end, assistant.output_tokens
-    #[derive(Debug)]
+    #[derive(Debug, Clone)]
     struct SimpleBlock {
         start: DateTime<Utc>,
         end: DateTime<Utc>,
         assistant_output_tokens: i64,
+        projected: bool,
     }
 
-    let simple: Vec<SimpleBlock> = current_blocks
-        .iter()
-        .filter_map(|b| match (b.start, b.end) {
-            (Some(s), Some(e)) => Some(SimpleBlock {
-                start: s,
-                end: e,
-                assistant_output_tokens: b.assistant.output_tokens,
-            }),
-            _ => None,
-        })
-        .collect();
+    let mut simple: Vec<SimpleBlock> = Vec::new();
+    for b in &current_blocks {
+        if let (Some(s), Some(e)) = (b.start, b.end) {
+            let is_projected = b.reset == "projected";
+            let out = b.assistant.output_tokens;
+            if out == 0 && !is_projected {
+                continue; // skip zero-token non-projected blocks
+            }
+            simple.push(SimpleBlock { start: s, end: e, assistant_output_tokens: out, projected: is_projected });
+        }
+    }
 
     println!("SimpleBlocks: {:#?}", simple);
+
+    // Slot stats: 0-6, 6-12, 12-18, 18-24; if a 5h block crosses a boundary, count it in both slots
+    #[derive(Debug, Default, Clone)]
+    struct SlotStat { count: usize, sum: i128, mean: f64, median: f64, ema: f64 }
+
+    fn slot_label(hour: u32) -> &'static str {
+        match hour {
+            0..=5 => "0-6",
+            6..=11 => "6-12",
+            12..=17 => "12-18",
+            _ => "18-24",
+        }
+    }
+
+    fn next_boundary_after(dt: DateTime<Utc>) -> DateTime<Utc> {
+        let h = dt.hour();
+        // boundaries at 6,12,18,24
+        let next_h = if h < 6 { 6 } else if h < 12 { 12 } else if h < 18 { 18 } else { 24 };
+        let day = dt.date_naive();
+        let base = day.and_hms_opt(0, 0, 0).unwrap().and_local_timezone(Utc).single().unwrap();
+        let mut boundary = base + Duration::hours(next_h as i64);
+        if boundary <= dt { boundary += Duration::hours(24); }
+        boundary
+    }
+
+    use std::collections::HashMap;
+    let mut slot_values: HashMap<&'static str, Vec<(DateTime<Utc>, i64)>> = HashMap::new();
+    for sb in &simple {
+        if sb.projected { continue; } // don't include projected in stats
+        let start = sb.start;
+        let end = sb.end;
+        let mut labels = vec![slot_label(start.hour())];
+        let boundary = next_boundary_after(start);
+        if boundary < end {
+            labels.push(slot_label((boundary.hour()) % 24));
+        }
+        for lab in labels {
+            slot_values.entry(lab).or_default().push((end, sb.assistant_output_tokens));
+        }
+    }
+    let mut slot_stats: HashMap<&'static str, SlotStat> = HashMap::new();
+    
+    fn compute_median(mut xs: Vec<i64>) -> f64 {
+        if xs.is_empty() { return 0.0; }
+        xs.sort_unstable();
+        let n = xs.len();
+        if n % 2 == 1 { xs[n/2] as f64 } else { (xs[n/2 - 1] as f64 + xs[n/2] as f64) / 2.0 }
+    }
+    fn compute_ema(mut pairs: Vec<(DateTime<Utc>, i64)>) -> f64 {
+        if pairs.is_empty() { return 0.0; }
+        pairs.sort_by_key(|p| p.0); // chronological
+        let n = pairs.len() as f64;
+        let alpha = 2.0 / (n + 1.0);
+        let mut ema = pairs[0].1 as f64;
+        for &(_, v) in pairs.iter().skip(1) {
+            ema = alpha * (v as f64) + (1.0 - alpha) * ema;
+        }
+        ema
+    }
+
+    for (lab, vals) in slot_values.into_iter() {
+        let count = vals.len();
+        let sum: i128 = vals.iter().map(|(_, v)| *v as i128).sum();
+        let mean = if count > 0 { sum as f64 / count as f64 } else { 0.0 };
+        let median = compute_median(vals.iter().map(|(_, v)| *v).collect());
+        let ema = compute_ema(vals);
+        slot_stats.insert(lab, SlotStat { count, sum, mean, median, ema });
+    }
+    println!("SlotStats: {:#?}", slot_stats);
 }
 fn print_guessblocks_debug(rows: &Vec<GuessBlock>) {
     println!("GuessBlocks: {:#?}", rows);
