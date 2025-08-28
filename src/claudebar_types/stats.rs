@@ -1,6 +1,6 @@
+use super::{ClaudeBarUsageEntry, UserRole};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use super::{ClaudeBarUsageEntry, UserRole};
 
 /// Statistics grouped by project
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -12,7 +12,7 @@ pub struct ProjectStats {
 }
 
 /// Statistics for a specific role
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 pub struct RoleStats {
     pub entry_count: usize,
     pub total_tokens: u32,
@@ -21,20 +21,6 @@ pub struct RoleStats {
     pub cache_creation_tokens: u32,
     pub cache_read_tokens: u32,
     pub total_content_length: usize,
-}
-
-impl Default for RoleStats {
-    fn default() -> Self {
-        Self {
-            entry_count: 0,
-            total_tokens: 0,
-            input_tokens: 0,
-            output_tokens: 0,
-            cache_creation_tokens: 0,
-            cache_read_tokens: 0,
-            total_content_length: 0,
-        }
-    }
 }
 
 impl RoleStats {
@@ -48,7 +34,7 @@ impl RoleStats {
         self.cache_read_tokens += entry.usage.cache_read_tokens;
         self.total_content_length += entry.content_length;
     }
-    
+
     /// Combine with another RoleStats
     pub fn combine(&mut self, other: &RoleStats) {
         self.entry_count += other.entry_count;
@@ -64,25 +50,25 @@ impl RoleStats {
 /// Group usage entries by project and calculate statistics
 pub fn group_by_project(entries: &[ClaudeBarUsageEntry]) -> Vec<ProjectStats> {
     let mut project_map: HashMap<String, (RoleStats, RoleStats)> = HashMap::new();
-    
+
     for entry in entries {
         let project_name = entry.file_info.folder_name.clone();
         let (user_stats, assistant_stats) = project_map.entry(project_name).or_default();
-        
+
         match entry.role {
             UserRole::User => user_stats.add_entry(entry),
             UserRole::Assistant => assistant_stats.add_entry(entry),
             UserRole::Unknown => {} // Skip unknown roles
         }
     }
-    
+
     // Convert to ProjectStats
     project_map
         .into_iter()
         .map(|(project_name, (user_stats, assistant_stats))| {
             let mut total_stats = user_stats.clone();
             total_stats.combine(&assistant_stats);
-            
+
             ProjectStats {
                 project_name,
                 user_stats,

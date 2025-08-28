@@ -42,19 +42,19 @@ pub fn run(config: &rs_claude_bar::ConfigInfo) {
         return;
     }
 
-    // Sort by timestamp (ascending for analysis)
-    all_entries.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
+    // Sort by timestamp (descending for analysis)
+    all_entries.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
 
     println!(
         "📈 Loaded {} entries from {} to {}",
         all_entries.len(),
         all_entries
-            .first()
+            .last()
             .unwrap()
             .timestamp
             .format("%Y-%m-%d %H:%M UTC"),
         all_entries
-            .last()
+            .first()
             .unwrap()
             .timestamp
             .format("%Y-%m-%d %H:%M UTC")
