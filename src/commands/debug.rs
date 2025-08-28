@@ -1,6 +1,7 @@
 use chrono::{DateTime, Utc};
-use rs_claude_bar::claude_types::{TranscriptEntry, Entry};
+use rs_claude_bar::claude_types::Entry;
 use rs_claude_bar::colors::*;
+use rs_claude_bar::claudebar_types::ClaudeBarUsageEntry;
 use std::fs;
 use std::path::Path;
 
@@ -15,7 +16,7 @@ struct FileParseStats {
     total_output_tokens: u32,
 }
 
-pub fn run(config: &rs_claude_bar::ConfigInfo, parse: bool, file: Option<String>) {
+pub fn run(config: &rs_claude_bar::ConfigInfo, parse: bool, file: Option<String>, blocks: bool, gaps: bool, limits: bool) {
     let base_path = format!("{}/projects", config.claude_data_path);
     let path = Path::new(&base_path);
 
@@ -28,6 +29,8 @@ pub fn run(config: &rs_claude_bar::ConfigInfo, parse: bool, file: Option<String>
         run_single_file_debug(&base_path, &filepath);
     } else if parse {
         run_parse_debug(&base_path);
+    } else if blocks || gaps || limits {
+        run_blocks_debug(config, gaps, limits);
     } else {
         // Default behavior - show table view
         run_parse_debug(&base_path);
@@ -349,7 +352,7 @@ fn run_single_file_debug(base_path: &str, target_file: &str) {
     }
 }
 
-fn analyze_single_file_with_errors(content: &str, file_path: &str) {
+fn analyze_single_file_with_errors(content: &str, _file_path: &str) {
     let mut stats = FileParseStats::default();
     let mut parse_errors = Vec::new();
 
@@ -550,5 +553,305 @@ fn format_number_with_separators(num: u32) -> String {
     }
     
     result
+}
+
+fn run_blocks_debug(config: &rs_claude_bar::ConfigInfo, gaps: bool, limits: bool) {
+    // Load entries directly and implement debug functionality here
+    let base_path = format!("{}/projects", config.claude_data_path);
+    let all_entries = load_usage_entries(&base_path);
+
+    if limits {
+        print_limits_debug(&all_entries);
+    } else if gaps {
+        let blocks = compute_blocks(&all_entries);
+        print_gaps_debug(&blocks);
+    } else {
+        let blocks = compute_blocks(&all_entries);
+        print_blocks_debug(&blocks, &all_entries);
+    }
+}
+
+fn load_usage_entries(base_path: &str) -> Vec<ClaudeBarUsageEntry> {
+    let mut usage_entries = Vec::new();
+    let path = Path::new(base_path);
+
+    if let Ok(entries) = fs::read_dir(path) {
+        for entry in entries.flatten() {
+            if entry.path().is_dir() {
+                let folder_name = entry.file_name().to_string_lossy().to_string();
+
+                if let Ok(files) = fs::read_dir(entry.path()) {
+                    for file in files.flatten() {
+                        if file.path().extension().and_then(|s| s.to_str()) == Some("jsonl") {
+                            let file_name = file.file_name().to_string_lossy().to_string();
+
+                            let file_date = file
+                                .metadata()
+                                .ok()
+                                .and_then(|meta| meta.modified().ok())
+                                .map(|time| DateTime::<Utc>::from(time));
+
+                            if let Ok(content) = fs::read_to_string(file.path()) {
+                                for line in content.lines() {
+                                    if line.trim().is_empty() {
+                                        continue;
+                                    }
+
+                                    if let Ok(entry_parsed) = serde_json::from_str::<Entry>(line) {
+                                        if let Entry::Transcript(transcript) = entry_parsed {
+                                            let usage_entry = ClaudeBarUsageEntry::from_transcript(
+                                                &transcript,
+                                                folder_name.clone(),
+                                                file_name.clone(),
+                                                file_date,
+                                            );
+                                            usage_entries.push(usage_entry);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    usage_entries.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
+    usage_entries
+}
+
+fn compute_blocks(entries: &[ClaudeBarUsageEntry]) -> Vec<UsageBlock> {
+    // Simple 5-hour block computation
+    let mut blocks = Vec::new();
+    if entries.is_empty() {
+        return blocks;
+    }
+
+    let mut current_block_start = entries[0].timestamp;
+    let mut current_entries = Vec::new();
+    let mut total_tokens = 0;
+
+    for entry in entries {
+        let hours_diff = (entry.timestamp - current_block_start).num_hours();
+        
+        if hours_diff >= 5 {
+            // Close current block
+            if !current_entries.is_empty() {
+                let end_time = current_entries.last().map(|e: &ClaudeBarUsageEntry| e.timestamp);
+                let limit_reached = current_entries.iter().any(|e| e.is_limit_reached);
+                blocks.push(UsageBlock {
+                    start_time: current_block_start,
+                    end_time,
+                    entries: current_entries.clone(),
+                    guessed: false,
+                    limit_reached,
+                    total_tokens,
+                    unlock_time: end_time.map(|t| t + chrono::Duration::hours(5)),
+                });
+            }
+            
+            // Start new block
+            current_block_start = entry.timestamp;
+            current_entries.clear();
+            total_tokens = 0;
+        }
+        
+        current_entries.push(entry.clone());
+        total_tokens += entry.usage.output_tokens;
+    }
+
+    // Close final block
+    if !current_entries.is_empty() {
+        let end_time = current_entries.last().map(|e: &ClaudeBarUsageEntry| e.timestamp);
+        let limit_reached = current_entries.iter().any(|e| e.is_limit_reached);
+        blocks.push(UsageBlock {
+            start_time: current_block_start,
+            end_time,
+            entries: current_entries,
+            guessed: false,
+            limit_reached,
+            total_tokens,
+            unlock_time: end_time.map(|t| t + chrono::Duration::hours(5)),
+        });
+    }
+
+    blocks
+}
+
+#[derive(Debug, Clone)]
+struct UsageBlock {
+    pub start_time: DateTime<Utc>,
+    pub end_time: Option<DateTime<Utc>>,
+    pub entries: Vec<ClaudeBarUsageEntry>,
+    pub guessed: bool,
+    pub limit_reached: bool,
+    pub total_tokens: u32,
+    pub unlock_time: Option<DateTime<Utc>>,
+}
+
+fn print_limits_debug(all_entries: &[ClaudeBarUsageEntry]) {
+    println!(
+        "{bold}{purple}🔍 DEBUG: Limit Messages{reset}",
+        bold = if should_use_colors() { BOLD } else { "" },
+        purple = if should_use_colors() { PURPLE } else { "" },
+        reset = if should_use_colors() { RESET } else { "" },
+    );
+    println!();
+
+    let limit_entries: Vec<&ClaudeBarUsageEntry> =
+        all_entries.iter().filter(|e| e.is_limit_reached).collect();
+
+    if limit_entries.is_empty() {
+        println!("❌ No limit messages found");
+        return;
+    }
+
+    for entry in &limit_entries {
+        let path = format!("{}/{}", entry.file_info.folder_name, entry.file_info.file_name);
+
+        println!(
+            "{} | {}",
+            entry.timestamp.format("%Y-%m-%d %H:%M UTC"),
+            path
+        );
+        if let Some(text) = &entry.content_text {
+            println!("  {}", text.trim());
+        }
+    }
+
+    println!(
+        "{green}✅ Found {} limit messages{reset}",
+        limit_entries.len(),
+        green = if should_use_colors() { GREEN } else { "" },
+        reset = if should_use_colors() { RESET } else { "" },
+    );
+}
+
+fn print_blocks_debug(blocks: &[UsageBlock], _all_entries: &[ClaudeBarUsageEntry]) {
+    println!("{bold}{cyan}🔍 DEBUG: FIXED 5-Hour Windows Analysis{reset}",
+        bold = if should_use_colors() { BOLD } else { "" },
+        cyan = if should_use_colors() { CYAN } else { "" },
+        reset = if should_use_colors() { RESET } else { "" },
+    );
+    println!();
+    
+    let fixed_blocks: Vec<&UsageBlock> = blocks.iter()
+        .filter(|b| b.limit_reached && !b.guessed)
+        .collect();
+
+    if fixed_blocks.is_empty() {
+        println!("❌ No fixed 5-hour windows found (no limit reached entries)");
+        return;
+    }
+
+    println!("Found {} FIXED 5-hour windows:", fixed_blocks.len());
+    println!();
+
+    for (i, block) in fixed_blocks.iter().enumerate() {
+        println!("{bold}Window {} - {} to {}{reset}",
+            i + 1,
+            block.start_time.format("%m-%d %H:%M"),
+            block.end_time.unwrap_or(chrono::Utc::now()).format("%m-%d %H:%M"),
+            bold = if should_use_colors() { BOLD } else { "" },
+            reset = if should_use_colors() { RESET } else { "" },
+        );
+        
+        println!("  Total entries: {}", block.entries.len());
+        println!("  Total tokens: {}", format_number_with_separators(block.total_tokens));
+        println!();
+    }
+
+    println!("{green}✅ Found {} FIXED windows with confirmed limits{reset}",
+        fixed_blocks.len(),
+        green = if should_use_colors() { GREEN } else { "" },
+        reset = if should_use_colors() { RESET } else { "" },
+    );
+}
+
+fn print_gaps_debug(blocks: &[UsageBlock]) {
+    println!("{bold}{yellow}🕳️  DEBUG: Gap Analysis (Sessions){reset}",
+        bold = if should_use_colors() { BOLD } else { "" },
+        yellow = if should_use_colors() { YELLOW } else { "" },
+        reset = if should_use_colors() { RESET } else { "" },
+    );
+    println!();
+    
+    let session_blocks: Vec<&UsageBlock> = blocks.iter()
+        .filter(|b| b.guessed && !b.limit_reached)
+        .collect();
+        
+    if session_blocks.is_empty() {
+        println!("❌ No session gaps found (no entries with >1 hour gaps)");
+        return;
+    }
+    
+    println!("{bold}┌─────────────────────┬─────────────────────┬──────────┬─────────┬────────────┐{reset}",
+        bold = if should_use_colors() { BOLD } else { "" },
+        reset = if should_use_colors() { RESET } else { "" },
+    );
+    println!("{bold}│ Session Start       │ Session End         │ Duration │ Entries │ Status     │{reset}",
+        bold = if should_use_colors() { BOLD } else { "" },
+        reset = if should_use_colors() { RESET } else { "" },
+    );
+    println!("{bold}├─────────────────────┼─────────────────────┼──────────┼─────────┼────────────┤{reset}",
+        bold = if should_use_colors() { BOLD } else { "" },
+        reset = if should_use_colors() { RESET } else { "" },
+    );
+    
+    for block in &session_blocks {
+        let end_str = if let Some(end) = block.end_time {
+            end.format("%m-%d %H:%M").to_string()
+        } else {
+            "Ongoing".to_string()
+        };
+        
+        let duration = if let Some(end) = block.end_time {
+            let dur = end - block.start_time;
+            format_duration_hours(dur)
+        } else {
+            let dur = chrono::Utc::now() - block.start_time;
+            format!("{}+", format_duration_hours(dur))
+        };
+        
+        let status_colored = if block.end_time.is_none() {
+            format!("{green}Active{reset}", green = GREEN, reset = RESET)
+        } else {
+            format!("{gray}Complete{reset}", gray = GRAY, reset = RESET)
+        };
+        
+        let start_str = block.start_time.format("%m-%d %H:%M").to_string();
+        
+        println!("│ {:<19} │ {:<19} │ {:<8} │ {:>7} │ {:<10} │",
+            start_str,
+            end_str,
+            duration,
+            block.entries.len(),
+            status_colored
+        );
+    }
+    
+    println!("{bold}└─────────────────────┴─────────────────────┴──────────┴─────────┴────────────┘{reset}",
+        bold = if should_use_colors() { BOLD } else { "" },
+        reset = if should_use_colors() { RESET } else { "" },
+    );
+    
+    println!();
+    println!("{yellow}📝 Note: These are estimated session boundaries based on gaps > 1 hour{reset}",
+        yellow = if should_use_colors() { YELLOW } else { "" },
+        reset = if should_use_colors() { RESET } else { "" },
+    );
+}
+
+fn format_duration_hours(duration: chrono::Duration) -> String {
+    let total_minutes = duration.num_minutes();
+    let hours = total_minutes / 60;
+    let minutes = total_minutes % 60;
+    
+    if hours > 0 {
+        format!("{}h{:02}m", hours, minutes)
+    } else {
+        format!("{}m", minutes)
+    }
 }
 

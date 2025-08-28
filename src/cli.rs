@@ -9,8 +9,10 @@ pub struct Cli {
 
 #[derive(Subcommand, Clone)]
 pub enum Commands {
-    /// Show help information
-    Help,
+    /// Show basic usage information
+    Info,
+    /// Show detailed manual with examples
+    Manual,
     /// Show status line prompt
     Prompt,
     /// Show current Claude status
@@ -30,6 +32,15 @@ pub enum Commands {
         /// Target specific file for detailed error analysis
         #[arg(long, value_name = "FILEPATH")]
         file: Option<String>,
+        /// Show blocks debug information
+        #[arg(long)]
+        blocks: bool,
+        /// Show gaps analysis (sessions with gaps > 1 hour)
+        #[arg(long)]
+        gaps: bool,
+        /// Show limit messages analysis
+        #[arg(long)]
+        limits: bool,
     },
     /// Show usage data in table format
     Table,

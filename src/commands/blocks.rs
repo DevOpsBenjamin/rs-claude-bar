@@ -74,20 +74,34 @@ pub fn run(config: &rs_claude_bar::ConfigInfo, debug: bool, gaps: bool, limits: 
     // Sort blocks by start time descending (most recent first)
     blocks.sort_by(|a, b| b.start_time.cmp(&a.start_time));
 
-    // Handle debug modes (simplified - main debug functionality moved to debug command)
+    // Handle debug modes - redirect to debug command
     if debug {
-        if gaps {
-            print_gaps_debug(&blocks);
-        } else if limits {
-            print_limits_debug(&all_entries);
-        } else {
-            print_blocks_debug(&blocks, &all_entries);
-        }
-        println!();
         println!(
-            "{bold}{yellow}💡 Tip: Use 'debug --parse' for detailed JSONL parsing analysis{reset}",
+            "{bold}{yellow}⚠️  Blocks debug functionality has moved to the debug command{reset}",
             bold = if should_use_colors() { BOLD } else { "" },
             yellow = if should_use_colors() { YELLOW } else { "" },
+            reset = if should_use_colors() { RESET } else { "" },
+        );
+        println!();
+        println!("Use instead:");
+        if gaps {
+            println!("  {bold}debug --gaps{reset} - Show gaps analysis", 
+                bold = if should_use_colors() { BOLD } else { "" },
+                reset = if should_use_colors() { RESET } else { "" },
+            );
+        } else if limits {
+            println!("  {bold}debug --limits{reset} - Show limit messages analysis", 
+                bold = if should_use_colors() { BOLD } else { "" },
+                reset = if should_use_colors() { RESET } else { "" },
+            );
+        } else {
+            println!("  {bold}debug --blocks{reset} - Show blocks debug information", 
+                bold = if should_use_colors() { BOLD } else { "" },
+                reset = if should_use_colors() { RESET } else { "" },
+            );
+        }
+        println!("  {bold}debug --parse{reset} - Show JSONL parsing analysis", 
+            bold = if should_use_colors() { BOLD } else { "" },
             reset = if should_use_colors() { RESET } else { "" },
         );
         return;
