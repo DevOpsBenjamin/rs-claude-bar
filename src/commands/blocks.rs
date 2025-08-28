@@ -17,8 +17,7 @@ pub struct UsageBlock {
     pub unlock_time: Option<DateTime<Utc>>, // calculated unlock timestamp
     pub guessed: bool,
 }
-
-pub fn run(config: &rs_claude_bar::ConfigInfo, debug: bool, gaps: bool) {
+pub fn run(config: &rs_claude_bar::ConfigInfo, debug: bool, gaps: bool, limits: bool) {
     let mut updated_config = config.clone();
     let base_path = format!("{}/projects", config.claude_data_path);
     let path = Path::new(&base_path);
@@ -75,13 +74,22 @@ pub fn run(config: &rs_claude_bar::ConfigInfo, debug: bool, gaps: bool) {
     // Sort blocks by start time descending (most recent first)
     blocks.sort_by(|a, b| b.start_time.cmp(&a.start_time));
 
-    // Handle debug modes
+    // Handle debug modes (simplified - main debug functionality moved to debug command)
     if debug {
         if gaps {
             print_gaps_debug(&blocks);
+        } else if limits {
+            print_limits_debug(&all_entries);
         } else {
             print_blocks_debug(&blocks, &all_entries);
         }
+        println!();
+        println!(
+            "{bold}{yellow}💡 Tip: Use 'debug --parse' for detailed JSONL parsing analysis{reset}",
+            bold = if should_use_colors() { BOLD } else { "" },
+            yellow = if should_use_colors() { YELLOW } else { "" },
+            reset = if should_use_colors() { RESET } else { "" },
+        );
         return;
     }
 
@@ -202,6 +210,45 @@ pub fn run(config: &rs_claude_bar::ConfigInfo, debug: bool, gaps: bool) {
             eprintln!("Warning: Could not save updated config: {}", e);
         }
     }
+}
+
+/// Print all limit messages with their timestamps and file paths
+fn print_limits_debug(all_entries: &[ClaudeBarUsageEntry]) {
+    println!(
+        "{bold}{purple}🔍 DEBUG: Limit Messages{reset}",
+        bold = if should_use_colors() { BOLD } else { "" },
+        purple = if should_use_colors() { PURPLE } else { "" },
+        reset = if should_use_colors() { RESET } else { "" },
+    );
+    println!();
+
+    let limit_entries: Vec<&ClaudeBarUsageEntry> =
+        all_entries.iter().filter(|e| e.is_limit_reached).collect();
+
+    if limit_entries.is_empty() {
+        println!("❌ No limit messages found");
+        return;
+    }
+
+    for entry in &limit_entries {
+        let path = format!("{}/{}", entry.file_info.folder_name, entry.file_info.file_name);
+
+        println!(
+            "{} | {}",
+            entry.timestamp.format("%Y-%m-%d %H:%M UTC"),
+            path
+        );
+        if let Some(text) = &entry.content_text {
+            println!("  {}", text.trim());
+        }
+    }
+
+    println!(
+        "{green}✅ Found {} limit messages{reset}",
+        limit_entries.len(),
+        green = if should_use_colors() { GREEN } else { "" },
+        reset = if should_use_colors() { RESET } else { "" },
+    );
 }
 
 fn load_all_entries(base_path: &str) -> Vec<ClaudeBarUsageEntry> {

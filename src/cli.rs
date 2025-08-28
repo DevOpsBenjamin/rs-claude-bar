@@ -9,9 +9,11 @@ pub struct Cli {
 
 #[derive(Subcommand, Clone)]
 pub enum Commands {
+    /// Show help information
+    Help,
+    /// Show status line prompt
+    Prompt,
     /// Show current Claude status
-    Status,
-    /// Force refresh of cached stats
     Update,
     /// Show recent usage windows
     History,
@@ -21,7 +23,11 @@ pub enum Commands {
     #[command(name = "display-config")]
     DisplayConfig,
     /// Debug parse JSONL files in specified directory
-    Debug,
+    Debug {
+        /// Show detailed parsing statistics with ANSI table
+        #[arg(long)]
+        parse: bool,
+    },
     /// Show usage data in table format
     Table,
     /// Analyze and display 5-hour usage blocks
@@ -32,9 +38,14 @@ pub enum Commands {
         /// Show only gap analysis (requires --debug)
         #[arg(long, requires = "debug")]
         gaps: bool,
+        /// Show all limit messages with timestamps and file paths (requires --debug)
+        #[arg(long, requires = "debug")]
+        limits: bool,
     },
     /// List only limit messages with [end, end-5h]
     Resets,
+    /// Install command to configure Claude settings
+    Install,
     /// Manage configuration settings
     Config {
         #[command(subcommand)]
