@@ -8,9 +8,7 @@ mod tests {
 
     #[test]
     fn run_does_not_panic() {
-        let config = rs_claude_bar::ConfigInfo {
-            claude_data_path: "nonexistent".to_string(),
-        };
+        let config = rs_claude_bar::ConfigInfo::default();
         run(&config);
     }
 }

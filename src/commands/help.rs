@@ -1,7 +1,8 @@
 use rs_claude_bar::colors::*;
 
 pub fn run(_config: &rs_claude_bar::ConfigInfo) {
-    let help_text = format!(r#"
+    let help_text = format!(
+        r#"
 {bold}{cyan}🤖 Claude Bar - Enhanced Claude Code Usage Tracker{reset}
 
 {bold}DESCRIPTION:{reset}
@@ -84,9 +85,7 @@ mod tests {
 
     #[test]
     fn run_does_not_panic() {
-        let config = rs_claude_bar::ConfigInfo {
-            claude_data_path: "nonexistent".to_string(),
-        };
+        let config = rs_claude_bar::ConfigInfo::default();
         run(&config);
     }
 }
