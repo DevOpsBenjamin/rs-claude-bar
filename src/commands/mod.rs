@@ -3,6 +3,8 @@ pub mod config;
 pub mod debug;
 pub mod help;
 pub mod history;
+pub mod install;
+pub mod prompt;
 pub mod stats;
 pub mod status;
 pub mod table;
