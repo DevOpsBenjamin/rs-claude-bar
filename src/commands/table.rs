@@ -43,9 +43,9 @@ struct UsageRow {
     file: String,
 }
 
-pub fn run(data_path: Option<&str>) {
-    let base_path = data_path.unwrap_or("tests/data");
-    let path = Path::new(base_path);
+pub fn run(config: &rs_claude_bar::ConfigInfo) {
+    let base_path = format!("{}/projects", config.claude_data_path);
+    let path = Path::new(&base_path);
     
     if !path.exists() {
         eprintln!("Path does not exist: {}", base_path);

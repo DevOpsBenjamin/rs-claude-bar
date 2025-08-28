@@ -6,7 +6,7 @@ struct StatRow {
     value: &'static str,
 }
 
-pub fn run() {
+pub fn run(_config: &rs_claude_bar::ConfigInfo) {
     let data = [
         StatRow {
             metric: "Total Tokens",
@@ -27,6 +27,9 @@ mod tests {
 
     #[test]
     fn run_does_not_panic() {
-        run();
+        let config = rs_claude_bar::ConfigInfo {
+            claude_data_path: "nonexistent".to_string(),
+        };
+        run(&config);
     }
 }

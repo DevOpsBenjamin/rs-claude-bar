@@ -1,4 +1,7 @@
+pub mod blocks;
+pub mod config;
 pub mod debug;
+pub mod help;
 pub mod history;
 pub mod stats;
 pub mod status;

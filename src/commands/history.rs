@@ -1,4 +1,4 @@
-pub fn run() {
+pub fn run(_config: &rs_claude_bar::ConfigInfo) {
     println!("📜 Showing recent windows... (placeholder)");
 }
 
@@ -8,6 +8,9 @@ mod tests {
 
     #[test]
     fn run_does_not_panic() {
-        run();
+        let config = rs_claude_bar::ConfigInfo {
+            claude_data_path: "nonexistent".to_string(),
+        };
+        run(&config);
     }
 }

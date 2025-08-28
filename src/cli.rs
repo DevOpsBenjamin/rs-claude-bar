@@ -5,14 +5,6 @@ use clap::{Parser, Subcommand};
 pub struct Cli {
     #[command(subcommand)]
     pub command: Option<Commands>,
-    
-    /// Override data path (default: ~/.claude/projects)
-    #[arg(long, global = true)]
-    pub data_path: Option<String>,
-    
-    /// Use mock data mode
-    #[arg(long, global = true)]
-    pub mock_data: bool,
 }
 
 #[derive(Subcommand, Clone)]
@@ -32,4 +24,22 @@ pub enum Commands {
     Debug,
     /// Show usage data in table format
     Table,
+    /// Analyze and display 5-hour usage blocks
+    Blocks,
+    /// Show detailed help and usage examples
+    Help,
+    /// Manage configuration settings
+    Config {
+        #[command(subcommand)]
+        command: Option<ConfigCommands>,
+    },
+}
+
+#[derive(Subcommand, Clone)]
+pub enum ConfigCommands {
+    /// Display help for configuration commands
+    Help,
+    /// Configure Claude data path
+    #[command(name = "claude-path")]
+    ClaudePath,
 }

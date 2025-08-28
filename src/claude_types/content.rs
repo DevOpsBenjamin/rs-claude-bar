@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use super::tool_use::{ToolUseBlock, ToolResultBlock};
+use super::tool_use::ToolUseBlock;
 
 /// A content block within a message - can be text, tool_use, tool_result, etc.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -15,7 +15,13 @@ pub enum ContentBlock {
     
     /// Tool execution result
     #[serde(rename = "tool_result")]
-    ToolResult(ToolResultBlock),
+    ToolResult {
+        #[serde(rename = "tool_use_id")]
+        tool_use_id: String,
+        content: String,
+        #[serde(default)]
+        is_error: bool,
+    },
     
     /// Thinking block (Claude's internal reasoning)
     #[serde(rename = "thinking")]
@@ -32,7 +38,7 @@ impl ContentBlock {
         match self {
             ContentBlock::Text { text } => Some(text),
             ContentBlock::Thinking { content } => Some(content),
-            ContentBlock::ToolResult(result) => result.content.as_deref(),
+            ContentBlock::ToolResult { content, .. } => Some(content),
             _ => None,
         }
     }
@@ -49,6 +55,6 @@ impl ContentBlock {
     
     /// Check if this is a tool result block
     pub fn is_tool_result(&self) -> bool {
-        matches!(self, ContentBlock::ToolResult(_))
+        matches!(self, ContentBlock::ToolResult { .. })
     }
 }

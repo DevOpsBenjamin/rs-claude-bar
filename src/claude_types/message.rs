@@ -33,7 +33,7 @@ pub struct TranscriptMessage {
     
     /// Content - can be either a string or array of content blocks
     #[serde(default)]
-    pub content: Option<MessageContent>,
+    pub content: MessageContent,
 }
 
 /// Content can be either a string (for simple messages) or array of blocks (for complex messages)

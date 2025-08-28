@@ -39,7 +39,8 @@ struct RawModel {
 
 #[derive(Deserialize, Default)]
 struct RawEntry {
-    timestamp: String,
+    #[serde(default)]
+    timestamp: Option<String>,
     #[serde(rename = "sessionId", default)]
     session_id: String,
     #[serde(default)]
@@ -55,9 +56,12 @@ pub fn parse_jsonl_entry(line: &str) -> Result<UsageEntry, Box<dyn std::error::E
     let raw: RawEntry =
         serde_json::from_str(line).map_err(|e| format!("JSON parse error: {}", e))?;
 
-    let timestamp = DateTime::parse_from_rfc3339(&raw.timestamp)
-        .map_err(|e| format!("Invalid timestamp format: {}", e))?
-        .with_timezone(&Utc);
+    let timestamp = match raw.timestamp {
+        Some(ts) => DateTime::parse_from_rfc3339(&ts)
+            .map_err(|e| format!("Invalid timestamp format: {}", e))?
+            .with_timezone(&Utc),
+        None => return Err("Missing timestamp field".into()),
+    };
 
     let session_id = raw.session_id;
 
@@ -68,9 +72,7 @@ pub fn parse_jsonl_entry(line: &str) -> Result<UsageEntry, Box<dyn std::error::E
     let cache_creation_tokens = usage.cache_creation_input_tokens;
     let cache_read_tokens = usage.cache_read_input_tokens;
     let total_tokens = input_tokens + output_tokens + cache_creation_tokens + cache_read_tokens;
-    if total_tokens == 0 {
-        return Err("No token usage data (likely user message)".into());
-    }
+    // Keep all entries, even those with zero tokens (user messages have content length)
 
     let model_id = if !message.model.is_empty() {
         message.model
@@ -109,7 +111,10 @@ pub fn parse_jsonl_entry(line: &str) -> Result<UsageEntry, Box<dyn std::error::E
 
 /// Load all JSONL entries from Claude data directory  
 pub fn load_claude_data() -> Result<Vec<UsageEntry>, Box<dyn std::error::Error>> {
-    load_claude_data_from_path("tests/small")
+    // Default to Claude Code's data directory
+    let home = env::var("HOME")?;
+    let claude_projects_path = format!("{}/.claude/projects", home);
+    load_claude_data_from_path(&claude_projects_path)
 }
 
 /// Load JSONL entries from specific path
@@ -123,7 +128,7 @@ pub fn load_claude_data_from_path(data_path: &str) -> Result<Vec<UsageEntry>, Bo
     // Parse JSONL files and collect usage data
     let mut all_entries = Vec::new();
     let mut _total_files = 0;
-    let mut parse_errors = 0;
+    let mut _parse_errors = 0;
 
     if let Ok(entries) = fs::read_dir(&claude_dir) {
         for entry in entries.flatten() {
@@ -132,23 +137,15 @@ pub fn load_claude_data_from_path(data_path: &str) -> Result<Vec<UsageEntry>, Bo
                     if file.path().extension().and_then(|s| s.to_str()) == Some("jsonl") {
                         _total_files += 1;
                         if let Ok(content) = fs::read_to_string(file.path()) {
-                            for (line_num, line) in content.lines().enumerate() {
+                            for (_line_num, line) in content.lines().enumerate() {
                                 if line.trim().is_empty() {
                                     continue;
                                 }
                                 match parse_jsonl_entry(line) {
                                     Ok(entry) => all_entries.push(entry),
-                                    Err(e) => {
-                                        parse_errors += 1;
-                                        // Only log first few errors to avoid spam
-                                        if parse_errors <= 3 {
-                                            eprintln!(
-                                                "Parse error on line {} in {:?}: {}",
-                                                line_num + 1,
-                                                file.path(),
-                                                e
-                                            );
-                                        }
+                                    Err(_) => {
+                                        _parse_errors += 1;
+                                        // Silently skip parse errors
                                     }
                                 }
                             }

@@ -1,10 +1,6 @@
-use rs_claude_bar::{debug_output, generate_claude_status};
-
-pub fn run() {
-    match generate_claude_status() {
-        Ok(status) => println!("{}", status),
-        Err(_) => println!("{}", debug_output()),
-    }
+pub fn run(config: &rs_claude_bar::ConfigInfo) {
+    // TODO: Implement generate_claude_status_with_config that uses config
+    println!("🔄 Status with config path: {} (placeholder)", config.claude_data_path);
 }
 
 #[cfg(test)]
@@ -13,6 +9,9 @@ mod tests {
 
     #[test]
     fn run_does_not_panic() {
-        run();
+        let config = rs_claude_bar::ConfigInfo {
+            claude_data_path: "nonexistent".to_string(),
+        };
+        run(&config);
     }
 }

@@ -1,16 +1,20 @@
+pub mod app_dirs;
 pub mod claude_types;
 pub mod claudebar_types;
 pub mod colors;
 pub mod config;
+pub mod config_manager;
 pub mod parser;
 pub mod status;
 pub mod types;
 pub mod utils;
 
+pub use app_dirs::*;
 pub use claude_types::*;
 pub use claudebar_types::*;
 pub use colors::*;
-pub use config::*;
+pub use config::{load_config, reset_config_interactive, DisplayItem, Config};
+pub use config_manager::*;
 pub use parser::*;
 pub use status::*;
 pub use types::*;

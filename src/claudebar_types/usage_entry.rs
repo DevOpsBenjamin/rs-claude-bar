@@ -23,6 +23,9 @@ pub struct ClaudeBarUsageEntry {
     /// Whether this is a 5-hour limit reached message
     pub is_limit_reached: bool,
     
+    /// Full content text (only stored for limit messages to save memory)
+    pub content_text: Option<String>,
+    
     /// File information
     pub file_info: FileInfo,
 }
@@ -77,18 +80,20 @@ impl ClaudeBarUsageEntry {
             TokenUsage::default()
         };
         
-        // Calculate content length
-        let content_length = transcript.message.content
-            .as_ref()
-            .map(|c| c.as_text().len())
-            .unwrap_or(0);
+        // Calculate content length and extract text
+        let content_text_full = transcript.message.content.as_text();
+        let content_length = content_text_full.len();
         
         // Check if this is a 5-hour limit message
         let is_limit_reached = transcript.is_api_error_message && 
-            transcript.message.content
-                .as_ref()
-                .map(|c| c.as_text().contains("5-hour limit reached"))
-                .unwrap_or(false);
+            content_text_full.contains("5-hour limit reached");
+        
+        // Store content text only for limit messages to save memory
+        let content_text = if is_limit_reached {
+            Some(content_text_full)
+        } else {
+            None
+        };
         
         // Parse timestamp
         let timestamp = DateTime::parse_from_rfc3339(&transcript.timestamp)
@@ -102,6 +107,7 @@ impl ClaudeBarUsageEntry {
             usage,
             content_length,
             is_limit_reached,
+            content_text,
             file_info: FileInfo {
                 folder_name,
                 file_name,

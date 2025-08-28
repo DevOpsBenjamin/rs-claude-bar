@@ -2,9 +2,9 @@ use std::fs;
 use std::path::Path;
 use rs_claude_bar::claude_types::TranscriptEntry;
 
-pub fn run(data_path: Option<&str>) {
-    let base_path = data_path.unwrap_or("tests/data");
-    let path = Path::new(base_path);
+pub fn run(config: &rs_claude_bar::ConfigInfo) {
+    let base_path = format!("{}/projects", config.claude_data_path);
+    let path = Path::new(&base_path);
     
     if !path.exists() {
         eprintln!("Path does not exist: {}", base_path);
@@ -105,6 +105,9 @@ mod tests {
 
     #[test]
     fn run_does_not_panic() {
-        run(Some("nonexistent"));
+        let config = rs_claude_bar::ConfigInfo {
+            claude_data_path: "nonexistent".to_string(),
+        };
+        run(&config);
     }
 }
