@@ -25,7 +25,10 @@ pub enum ContentBlock {
     
     /// Thinking block (Claude's internal reasoning)
     #[serde(rename = "thinking")]
-    Thinking { content: String },
+    Thinking { 
+        thinking: String,
+        signature: Option<String>,
+    },
     
     /// Unknown/future content type - fallback for any unrecognized types
     #[serde(other)]
@@ -37,7 +40,7 @@ impl ContentBlock {
     pub fn extract_text(&self) -> Option<&str> {
         match self {
             ContentBlock::Text { text } => Some(text),
-            ContentBlock::Thinking { content } => Some(content),
+            ContentBlock::Thinking { thinking, .. } => Some(thinking),
             ContentBlock::ToolResult { content, .. } => Some(content),
             _ => None,
         }

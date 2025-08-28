@@ -21,7 +21,7 @@ fn main() {
         Commands::History => commands::history::run(&config),
         Commands::Stats => commands::stats::run(&config),
         Commands::DisplayConfig => commands::display_config::run(&config),
-        Commands::Debug { parse } => commands::debug::run(&config, parse),
+        Commands::Debug { parse, file } => commands::debug::run(&config, parse, file),
         Commands::Table => commands::table::run(&config),
         Commands::Blocks { debug, gaps, limits } => commands::blocks::run(&config, debug, gaps, limits),
         Commands::Resets => commands::resets::run(&config),

@@ -15,7 +15,7 @@ struct FileParseStats {
     total_output_tokens: u32,
 }
 
-pub fn run(config: &rs_claude_bar::ConfigInfo, parse_mode: bool) {
+pub fn run(config: &rs_claude_bar::ConfigInfo, parse: bool, file: Option<String>) {
     let base_path = format!("{}/projects", config.claude_data_path);
     let path = Path::new(&base_path);
 
@@ -24,11 +24,13 @@ pub fn run(config: &rs_claude_bar::ConfigInfo, parse_mode: bool) {
         return;
     }
 
-    if parse_mode {
+    if let Some(filepath) = file {
+        run_single_file_debug(&base_path, &filepath);
+    } else if parse {
         run_parse_debug(&base_path);
     } else {
-        // Keep original debug functionality as fallback
-        run_original_debug(&base_path);
+        // Default behavior - show table view
+        run_parse_debug(&base_path);
     }
 }
 
@@ -287,59 +289,247 @@ fn print_summary(all_file_stats: &[(String, FileParseStats)]) {
     }
 }
 
-fn run_original_debug(base_path: &str) {
-    println!("=== DEBUG: Original parsing debug ===");
-    println!("Base path: {}", base_path);
-    
+
+fn run_single_file_debug(base_path: &str, target_file: &str) {
+    println!(
+        "{bold}{cyan}🔍 DEBUG: Single File Parse Analysis{reset}",
+        bold = if should_use_colors() { BOLD } else { "" },
+        cyan = if should_use_colors() { CYAN } else { "" },
+        reset = if should_use_colors() { RESET } else { "" },
+    );
+    println!("Target file: {}", target_file);
+    println!();
+
     let path = Path::new(base_path);
+    let mut file_found = false;
 
     if let Ok(entries) = fs::read_dir(path) {
-        for entry in entries.flatten() {
+        'outer: for entry in entries.flatten() {
             if entry.path().is_dir() {
-                let folder_name = entry.file_name();
-                println!("\n📁 FOLDER: {:?}", folder_name);
+                let folder_name = entry.file_name().to_string_lossy().to_string();
 
                 if let Ok(files) = fs::read_dir(entry.path()) {
                     for file in files.flatten() {
                         if file.path().extension().and_then(|s| s.to_str()) == Some("jsonl") {
-                            let file_name = file.file_name();
-                            println!("  📄 FILE: {:?}", file_name);
-
-                            if let Ok(content) = fs::read_to_string(file.path()) {
-                                for (line_num, line) in content.lines().enumerate() {
-                                    if line.trim().is_empty() {
-                                        continue;
-                                    }
-
-                                    // Try to parse as TranscriptEntry
-                                    match serde_json::from_str::<TranscriptEntry>(line) {
-                                        Ok(entry) => {
-                                            println!(
-                                                "    Line {}: ✅ TranscriptEntry",
-                                                line_num + 1
-                                            );
-                                            println!("      -> Full Object: {:#?}", entry);
-                                        }
-                                        Err(parse_error) => {
-                                            println!("    Line {}: ❌ Failed to parse as TranscriptEntry", line_num + 1);
-                                            println!("      -> Parse Error: {}", parse_error);
-                                            println!(
-                                                "      -> Line content (first 200 chars): {}",
-                                                line.chars().take(200).collect::<String>()
-                                            );
-                                        }
-                                    }
+                            let file_name = file.file_name().to_string_lossy().to_string();
+                            let file_path = format!("{}/{}", folder_name, file_name);
+                            
+                            // Check if this is the target file (partial match)
+                            if file_path.contains(target_file) || file_name.contains(target_file) {
+                                file_found = true;
+                                println!(
+                                    "{bold}📄 Analyzing: {}{reset}",
+                                    file_path,
+                                    bold = if should_use_colors() { BOLD } else { "" },
+                                    reset = if should_use_colors() { RESET } else { "" },
+                                );
+                                println!();
+                                
+                                if let Ok(content) = fs::read_to_string(file.path()) {
+                                    analyze_single_file_with_errors(&content, &file_path);
+                                } else {
+                                    println!("❌ Could not read file: {}", file_path);
                                 }
-                            } else {
-                                println!("  ❌ Could not read file: {:?}", file_name);
+                                break 'outer;
                             }
                         }
                     }
                 }
             }
         }
+    }
+
+    if !file_found {
+        println!("❌ File not found: {}", target_file);
+        println!();
+        println!("Available files:");
+        list_available_files(base_path);
+    }
+}
+
+fn analyze_single_file_with_errors(content: &str, file_path: &str) {
+    let mut stats = FileParseStats::default();
+    let mut parse_errors = Vec::new();
+
+    for (line_num, line) in content.lines().enumerate() {
+        stats.total_lines += 1;
+
+        if line.trim().is_empty() {
+            stats.empty_lines += 1;
+            continue;
+        }
+
+        match serde_json::from_str::<TranscriptEntry>(line) {
+            Ok(entry) => {
+                stats.successful_parses += 1;
+                
+                // Parse timestamp and update bounds
+                if let Ok(timestamp) = DateTime::parse_from_rfc3339(&entry.timestamp) {
+                    let timestamp_utc = timestamp.with_timezone(&Utc);
+                    if stats.min_timestamp.is_none() || timestamp_utc < stats.min_timestamp.unwrap() {
+                        stats.min_timestamp = Some(timestamp_utc);
+                    }
+                    if stats.max_timestamp.is_none() || timestamp_utc > stats.max_timestamp.unwrap() {
+                        stats.max_timestamp = Some(timestamp_utc);
+                    }
+                }
+
+                // Add output tokens if available
+                if let Some(ref usage) = entry.message.usage {
+                    stats.total_output_tokens += usage.output_tokens;
+                }
+            }
+            Err(parse_error) => {
+                stats.parse_errors += 1;
+                parse_errors.push((line_num + 1, parse_error.to_string(), line.to_string()));
+            }
+        }
+    }
+
+    // Print file stats
+    println!(
+        "{bold}📊 File Statistics:{reset}",
+        bold = if should_use_colors() { BOLD } else { "" },
+        reset = if should_use_colors() { RESET } else { "" },
+    );
+    println!("   Total lines: {}", stats.total_lines);
+    println!("   Successfully parsed: {}", stats.successful_parses);
+    println!("   Empty lines: {}", stats.empty_lines);
+    println!("   Parse errors: {}", stats.parse_errors);
+    println!("   Total output tokens: {}", format_number_with_separators(stats.total_output_tokens));
+
+    if let Some(min_ts) = stats.min_timestamp {
+        println!(
+            "   Date range: {} to {}",
+            min_ts.format("%Y-%m-%d %H:%M UTC"),
+            stats.max_timestamp.unwrap().format("%Y-%m-%d %H:%M UTC")
+        );
+    }
+
+    let success_rate = if stats.total_lines > stats.empty_lines {
+        let parseable_lines = stats.total_lines - stats.empty_lines;
+        (stats.successful_parses as f64 / parseable_lines as f64) * 100.0
     } else {
-        eprintln!("Could not read directory: {}", base_path);
+        0.0
+    };
+    println!("   Success rate: {:.1}%", success_rate);
+
+    if !parse_errors.is_empty() {
+        println!();
+        println!(
+            "{bold}{red}❌ Parse Errors ({} total):{reset}",
+            parse_errors.len(),
+            bold = if should_use_colors() { BOLD } else { "" },
+            red = if should_use_colors() { RED } else { "" },
+            reset = if should_use_colors() { RESET } else { "" },
+        );
+        println!();
+
+        for (line_num, error, line_content) in &parse_errors {
+            println!(
+                "{bold}Line {}:{reset}",
+                line_num,
+                bold = if should_use_colors() { BOLD } else { "" },
+                reset = if should_use_colors() { RESET } else { "" },
+            );
+            println!("  Error: {}", error);
+            
+            // Show first 200 chars of problematic line
+            let truncated_line = if line_content.len() > 200 {
+                format!("{}...", &line_content[..200])
+            } else {
+                line_content.clone()
+            };
+            println!("  Content: {}", truncated_line);
+            
+            // Try to parse as generic JSON and show structure
+            if let Ok(json_value) = serde_json::from_str::<serde_json::Value>(line_content) {
+                if let Some(obj) = json_value.as_object() {
+                    let keys: Vec<&String> = obj.keys().collect();
+                    println!("  Available keys: {:?}", keys);
+                    
+                    // Check for common problematic fields
+                    if let Some(timestamp) = obj.get("timestamp") {
+                        println!("  Timestamp field: {:?}", timestamp);
+                    }
+                    if let Some(message) = obj.get("message") {
+                        if let Some(msg_obj) = message.as_object() {
+                            let msg_keys: Vec<&String> = msg_obj.keys().collect();
+                            println!("  Message keys: {:?}", msg_keys);
+                        }
+                    }
+                }
+            } else {
+                println!("  ⚠️  Not valid JSON");
+            }
+            
+            println!();
+        }
+
+        // Provide suggestions
+        println!(
+            "{bold}{yellow}💡 Parsing Suggestions:{reset}",
+            bold = if should_use_colors() { BOLD } else { "" },
+            yellow = if should_use_colors() { YELLOW } else { "" },
+            reset = if should_use_colors() { RESET } else { "" },
+        );
+        
+        // Analyze common error patterns
+        let missing_field_errors = parse_errors.iter()
+            .filter(|(_, error, _)| error.contains("missing field"))
+            .count();
+        
+        let type_mismatch_errors = parse_errors.iter()
+            .filter(|(_, error, _)| error.contains("invalid type"))
+            .count();
+            
+        let unknown_field_errors = parse_errors.iter()
+            .filter(|(_, error, _)| error.contains("unknown field"))
+            .count();
+
+        if missing_field_errors > 0 {
+            println!("   • {} errors due to missing required fields", missing_field_errors);
+            println!("     Consider making more fields optional in TranscriptEntry");
+        }
+        
+        if type_mismatch_errors > 0 {
+            println!("   • {} errors due to type mismatches", type_mismatch_errors);
+            println!("     Check field types in TranscriptEntry struct");
+        }
+        
+        if unknown_field_errors > 0 {
+            println!("   • {} errors due to unknown fields", unknown_field_errors);
+            println!("     Consider adding #[serde(flatten)] or #[serde(other)]");
+        }
+    } else {
+        println!();
+        println!(
+            "{bold}{green}✅ All lines parsed successfully!{reset}",
+            bold = if should_use_colors() { BOLD } else { "" },
+            green = if should_use_colors() { GREEN } else { "" },
+            reset = if should_use_colors() { RESET } else { "" },
+        );
+    }
+}
+
+fn list_available_files(base_path: &str) {
+    let path = Path::new(base_path);
+    
+    if let Ok(entries) = fs::read_dir(path) {
+        for entry in entries.flatten() {
+            if entry.path().is_dir() {
+                let folder_name = entry.file_name().to_string_lossy().to_string();
+
+                if let Ok(files) = fs::read_dir(entry.path()) {
+                    for file in files.flatten() {
+                        if file.path().extension().and_then(|s| s.to_str()) == Some("jsonl") {
+                            let file_name = file.file_name().to_string_lossy().to_string();
+                            println!("   {}/{}", folder_name, file_name);
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 

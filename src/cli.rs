@@ -24,9 +24,12 @@ pub enum Commands {
     DisplayConfig,
     /// Debug parse JSONL files in specified directory
     Debug {
-        /// Show detailed parsing statistics with ANSI table
+        /// Show detailed parsing statistics with ANSI table for all files
         #[arg(long)]
         parse: bool,
+        /// Target specific file for detailed error analysis
+        #[arg(long, value_name = "FILEPATH")]
+        file: Option<String>,
     },
     /// Show usage data in table format
     Table,
