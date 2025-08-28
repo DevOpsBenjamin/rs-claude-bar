@@ -8,3 +8,4 @@ pub mod status;
 pub mod table;
 pub mod update;
 pub mod display_config;
+pub mod resets;

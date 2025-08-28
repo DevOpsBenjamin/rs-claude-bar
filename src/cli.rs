@@ -26,6 +26,8 @@ pub enum Commands {
     Table,
     /// Analyze and display 5-hour usage blocks
     Blocks,
+    /// List only limit messages with [end, end-5h]
+    Resets,
     /// Show detailed help and usage examples
     Help,
     /// Manage configuration settings

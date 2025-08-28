@@ -36,6 +36,7 @@ fn main() {
         Commands::Debug => commands::debug::run(&config),
         Commands::Table => commands::table::run(&config),
         Commands::Blocks => commands::blocks::run(&config),
+        Commands::Resets => commands::resets::run(&config),
         Commands::Help => commands::help::run(&config),
         Commands::Config { command } => commands::config::run(command, &config),
     }
