@@ -22,7 +22,7 @@ fn main() {
         Commands::DisplayConfig => commands::display_config::run(&config),
         Commands::Debug => commands::debug::run(&config),
         Commands::Table => commands::table::run(&config),
-        Commands::Blocks => commands::blocks::run(&config),
+        Commands::Blocks { debug, gaps } => commands::blocks::run(&config, debug, gaps),
         Commands::Resets => commands::resets::run(&config),
         Commands::Config { command } => commands::config::run(command, &config),
     }

@@ -25,7 +25,14 @@ pub enum Commands {
     /// Show usage data in table format
     Table,
     /// Analyze and display 5-hour usage blocks
-    Blocks,
+    Blocks {
+        /// Show debug information for blocks analysis
+        #[arg(long)]
+        debug: bool,
+        /// Show only gap analysis (requires --debug)
+        #[arg(long, requires = "debug")]
+        gaps: bool,
+    },
     /// List only limit messages with [end, end-5h]
     Resets,
     /// Manage configuration settings
