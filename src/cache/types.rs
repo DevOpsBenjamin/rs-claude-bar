@@ -21,10 +21,12 @@ pub struct CachedFolder {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CachedFile {
     pub file_name: String,
-    pub modified_time: DateTime<Utc>,   //Use as cache date
-    pub data: Vec<CachedFileData>,      // Empty for now, will be populated later
+    pub cache_time: DateTime<Utc>,   //Use as cache date
+    pub data: Vec<CachedFileData>,   // Empty for now, will be populated later
     #[serde(skip)]
     pub cache_status: CacheStatus,
+    #[serde(skip)]
+    pub modified_time: DateTime<Utc>,
     #[serde(skip)]
     pub created_time: DateTime<Utc>,
     #[serde(skip)]

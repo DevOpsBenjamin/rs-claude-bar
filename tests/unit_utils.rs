@@ -1,4 +1,5 @@
-use chrono::Duration;
+use chrono::{Duration, DateTime, Utc, Timelike};
+
 use rs_claude_bar::utils::formatting::{
     format_duration,
     format_token_count,
@@ -38,4 +39,17 @@ fn test_format_number_with_separators() {
     assert_eq!(format_number_with_separators(1234), "1,234");
     assert_eq!(format_number_with_separators(1234567), "1,234,567");
     assert_eq!(format_number_with_separators(123), "123");
+}
+
+#[test]
+fn test_round_to_hour_boundary() {
+    let test_time = Utc.with_ymd_and_hms(2025, 8, 29, 15, 44, 30).unwrap();
+    let expected = Utc.with_ymd_and_hms(2025, 8, 29, 15, 0, 0).unwrap();
+    assert_eq!(round_to_hour_boundary(test_time), expected);
+}
+    
+#[test]
+fn test_already_on_boundary() {
+    let test_time = Utc.with_ymd_and_hms(2025, 8, 29, 15, 0, 0).unwrap();
+    assert_eq!(round_to_hour_boundary(test_time), test_time);
 }

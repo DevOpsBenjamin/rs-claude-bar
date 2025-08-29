@@ -18,13 +18,16 @@ fn main() {
     // Parse CLI first to get global flags
     let cli = Cli::parse();
     
+    let cache = std::time::Instant::now();
     // Load cache (will automatically scan projects subdirectory)
     let mut cache_manager = CacheManager::new(&config.claude_data_path, cli.no_cache);
-    let cache_duration = start.elapsed();
+    let cache_duration = cache.elapsed();
 
+    let file = std::time::Instant::now();
     cache_manager.refresh_cache();
-    let file_duration = start.elapsed();
+    let file_duration = file.elapsed();
 
+    let exec = std::time::Instant::now();
     // Execute the command  
     match cli.command.unwrap_or(Commands::Info) {
         Commands::Info => commands::info::run(&config),
@@ -38,7 +41,8 @@ fn main() {
         //Helper for debuging some part of code no use for real app
         Commands::Debug { parse, cache, file, blocks, gaps, limits, files } => commands::debug::run(&config, &mut cache_manager, parse, cache, file, blocks, gaps, limits, files),
     }    
-    let exec_duration = start.elapsed();
+    let exec_duration = exec.elapsed();
+    let total_duration = start.elapsed();
 
     //You can alwasy check last cmd duration
     let path = dirs::home_dir()
@@ -46,12 +50,13 @@ fn main() {
         .join(".claude-bar/last_exec");
 
     let content = format!(
-        "Timestamp: {}\nConfig: {:.1} ms\nCache: {:.1} ms\nFile: {:.1} ms\nExec: {:.1} ms\n",
+        "Timestamp: {}\nConfig: {:.1} ms\nCache: {:.1} ms\nFile: {:.1} ms\nExec: {:.1} ms\nTotal: {:.1} ms\n",
         Utc::now().to_rfc3339(),
         config_duration.as_secs_f64() * 1000.0,
         cache_duration.as_secs_f64() * 1000.0,
         file_duration.as_secs_f64() * 1000.0,
         exec_duration.as_secs_f64() * 1000.0,
+        total_duration.as_secs_f64() * 1000.0,
     );
     let _ = fs::write(path, content);
 }
