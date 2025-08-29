@@ -98,7 +98,7 @@ fn scan_folder(cached_folder: &mut CachedFolder, folder_path: &Path) {
             Entry::Vacant(entry) => {
                 // New file not in cache - mark as NotInCache
                 entry.insert(CachedFile {
-                    file_name: file_name.clone(),
+                    file_name,
                     data: Vec::new(),
                     cache_status: CacheStatus::NotInCache,
                     modified_time,
