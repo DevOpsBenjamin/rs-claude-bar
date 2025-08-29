@@ -1,4 +1,4 @@
-use rs_claude_bar::ConfigInfo;
+use crate::claudebar_types::ConfigInfo;
 use serde_json::{json, Value};
 use std::fs;
 

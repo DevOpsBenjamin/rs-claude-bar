@@ -1,6 +1,12 @@
-use rs_claude_bar::colors::*;
 
-pub fn run(_config: &rs_claude_bar::ConfigInfo) {
+use crate::{
+    common::colors::*,
+    claudebar_types::{
+        config::ConfigInfo
+    }
+};
+
+pub fn run(_config: &ConfigInfo) {
     let help_text = format!(
         r#"
 {bold}{cyan}🤖 Claude Bar - Enhanced Claude Code Usage Tracker{reset}
@@ -81,12 +87,12 @@ pub fn run(_config: &rs_claude_bar::ConfigInfo) {
     - License: MIT
 
 "#,
-        bold = if should_use_colors() { BOLD } else { "" },
-        reset = if should_use_colors() { RESET } else { "" },
-        cyan = if should_use_colors() { CYAN } else { "" },
-        green = if should_use_colors() { GREEN } else { "" },
-        yellow = if should_use_colors() { YELLOW } else { "" },
-        gray = if should_use_colors() { GRAY } else { "" },
+        bold = { BOLD },
+        reset = { RESET },
+        cyan = { CYAN },
+        green = { GREEN },
+        yellow = { YELLOW },
+        gray = { GRAY },
     );
 
     print!("{}", help_text);

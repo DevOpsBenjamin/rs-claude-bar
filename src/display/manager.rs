@@ -2,9 +2,25 @@ use chrono::{DateTime, Utc, Duration};
 use crate::{
     claudebar_types::StatsFile,
     analyze::{BlockStatus, detect_block_status},
-    colors::*,
+    display::
+    {
+        items::
+        {
+            DisplayItem, 
+            StatType, 
+            DisplayFormat
+        },
+        formats::
+        {
+            format_model,
+            format_tokens,
+            format_percentage,
+            format_token_ratio,
+            format_block_status,
+            format_duration_display,
+        }
+    }
 };
-use super::{DisplayItem, StatType, DisplayFormat, formats};
 
 /// The Display Manager handles rendering the status line based on configuration
 pub struct DisplayManager {
@@ -31,7 +47,7 @@ impl DisplayManager {
         Self {
             items,
             separator: " | ".to_string(),
-            show_colors: should_use_colors_for_status(),
+            show_colors: true,
         }
     }
     
@@ -60,16 +76,16 @@ impl DisplayManager {
     fn render_item(&self, item: &DisplayItem, data: &DisplayData) -> String {
         match &item.stat_type {
             StatType::TokenUsage => {
-                formats::format_tokens(data.current_tokens, data.max_tokens, &item.format, &item.emoji)
+                format_tokens(data.current_tokens, data.max_tokens, &item.format, &item.emoji)
             }
             StatType::TokenPercentage => {
                 match &item.format {
                     DisplayFormat::Ratio => {
-                        formats::format_token_ratio(data.current_tokens, data.max_tokens, &item.format, &item.emoji)
+                        format_token_ratio(data.current_tokens, data.max_tokens, &item.format, &item.emoji)
                     }
                     _ => {
                         if let Some(percentage) = data.percentage {
-                            formats::format_percentage(percentage, &item.format, &item.emoji)
+                            format_percentage(percentage, &item.format, &item.emoji)
                         } else {
                             String::new()
                         }
@@ -78,14 +94,14 @@ impl DisplayManager {
             }
             StatType::TimeElapsed => {
                 if let Some(elapsed) = data.time_elapsed {
-                    formats::format_duration_display(elapsed, &item.format, &item.emoji)
+                    format_duration_display(elapsed, &item.format, &item.emoji)
                 } else {
                     String::new()
                 }
             }
             StatType::TimeRemaining => {
                 if let Some(remaining) = data.time_remaining {
-                    formats::format_duration_display(remaining, &item.format, &item.emoji)
+                    format_duration_display(remaining, &item.format, &item.emoji)
                 } else {
                     String::new()
                 }
@@ -105,7 +121,7 @@ impl DisplayManager {
             }
             StatType::Model => {
                 if let Some(model) = &data.model {
-                    formats::format_model(model, &item.format, &item.emoji)
+                    format_model(model, &item.format, &item.emoji)
                 } else {
                     String::new()
                 }
@@ -124,7 +140,7 @@ impl DisplayManager {
                 }
             }
             StatType::BlockStatus => {
-                formats::format_block_status(&data.block_status, &item.format, data.time_remaining)
+                format_block_status(&data.block_status, &item.format, data.time_remaining)
             }
         }
     }

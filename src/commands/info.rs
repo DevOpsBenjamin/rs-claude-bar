@@ -1,6 +1,14 @@
-use rs_claude_bar::colors::*;
+use crate::common::colors::*;
 
-pub fn run(_config: &rs_claude_bar::ConfigInfo) {
+use crate::{
+    common::colors::*,
+    claudebar_types::{
+        config::ConfigInfo
+    }
+};
+
+
+pub fn run(_config: &ConfigInfo) {
     let info_text = format!(
         r#"
 {bold}{cyan}🤖 Claude Bar{reset} - Claude Code Usage Tracker
@@ -11,9 +19,9 @@ pub fn run(_config: &rs_claude_bar::ConfigInfo) {
     rs-claude-bar help           Show all cmd help
     rs-claude-bar install        Setup Claude integration
 "#,
-        bold = if should_use_colors() { BOLD } else { "" },
-        reset = if should_use_colors() { RESET } else { "" },
-        cyan = if should_use_colors() { CYAN } else { "" },
+        bold = { BOLD },
+        reset = { RESET },
+        cyan = { CYAN },
     );
 
     print!("{}", info_text);

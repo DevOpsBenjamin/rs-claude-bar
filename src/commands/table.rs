@@ -1,7 +1,7 @@
 use chrono::{DateTime, Utc};
-use rs_claude_bar::{
-    claude_types::TranscriptEntry,
-    claudebar_types::{group_by_project, ClaudeBarUsageEntry},
+use crate::{
+    claude_types::transcript_entry::TranscriptEntry,
+    claudebar_types::usage_entry::ClaudeBarUsageEntry,
 };
 use std::fs;
 use std::path::Path;
@@ -46,7 +46,7 @@ struct UsageRow {
     file: String,
 }
 
-pub fn run(config: &rs_claude_bar::ConfigInfo) {
+pub fn run(config: &ConfigInfo) {
     let base_path = format!("{}/projects", config.claude_data_path);
     let path = Path::new(&base_path);
 

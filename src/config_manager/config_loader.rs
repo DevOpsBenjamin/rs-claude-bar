@@ -1,4 +1,4 @@
-use crate::app_dirs::{ensure_app_dir_exists, get_config_file_path};
+use crate::common::app_dirs::{ensure_app_dir_exists, get_config_file_path};
 use crate::claudebar_types::{ConfigInfo, StatsFile};
 use std::fs;
 

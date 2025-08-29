@@ -1,4 +1,7 @@
-use crate::claude_types::{MessageUsage, TranscriptEntry};
+use crate::claude_types::{
+    usage::MessageUsage,
+    transcript_entry::TranscriptEntry
+};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 

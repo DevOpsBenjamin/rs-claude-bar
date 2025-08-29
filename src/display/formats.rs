@@ -1,20 +1,21 @@
-use crate::colors::*;
+use crate::common::colors::{RED, YELLOW, GREEN, RESET, BOLD};
+use crate::display::items::DisplayFormat;
 use chrono::Duration;
 
 /// Format a token count based on display format
-pub fn format_tokens(count: i64, max_tokens: Option<i64>, format: &super::DisplayFormat, emoji: &Option<String>) -> String {
+pub fn format_tokens(count: i64, max_tokens: Option<i64>, format: &DisplayFormat, emoji: &Option<String>) -> String {
     match format {
-        super::DisplayFormat::Text => {
+        DisplayFormat::Text => {
             format!("{} tokens", format_number(count))
         }
-        super::DisplayFormat::TextWithEmoji => {
+        DisplayFormat::TextWithEmoji => {
             let emoji_str = emoji.as_deref().unwrap_or("🧠");
             format!("{} {}", emoji_str, format_number(count))
         }
-        super::DisplayFormat::Compact => {
+        DisplayFormat::Compact => {
             format_number_compact(count)
         }
-        super::DisplayFormat::ProgressBar => {
+        DisplayFormat::ProgressBar => {
             if let Some(max) = max_tokens {
                 let percentage = (count as f64 / max as f64 * 100.0) as u8;
                 format_progress_bar(percentage, Some(format_number(count)))
@@ -22,7 +23,7 @@ pub fn format_tokens(count: i64, max_tokens: Option<i64>, format: &super::Displa
                 format!("{} tokens", format_number(count))
             }
         }
-        super::DisplayFormat::PercentageOnly => {
+        DisplayFormat::PercentageOnly => {
             if let Some(max) = max_tokens {
                 let percentage = (count as f64 / max as f64 * 100.0) as u8;
                 format!("{}%", percentage)
@@ -35,23 +36,23 @@ pub fn format_tokens(count: i64, max_tokens: Option<i64>, format: &super::Displa
 }
 
 /// Format a percentage based on display format
-pub fn format_percentage(percentage: u8, format: &super::DisplayFormat, emoji: &Option<String>) -> String {
+pub fn format_percentage(percentage: u8, format: &DisplayFormat, emoji: &Option<String>) -> String {
     match format {
-        super::DisplayFormat::Text => {
+        DisplayFormat::Text => {
             format!("{}%", percentage)
         }
-        super::DisplayFormat::TextWithEmoji => {
+        DisplayFormat::TextWithEmoji => {
             let emoji_str = emoji.as_deref().unwrap_or("🧠");
             let color = percentage_color(percentage);
             format!("{} {}{}%{}", emoji_str, color, percentage, RESET)
         }
-        super::DisplayFormat::ProgressBar => {
+        DisplayFormat::ProgressBar => {
             format_progress_bar(percentage, None)
         }
-        super::DisplayFormat::PercentageOnly => {
+        DisplayFormat::PercentageOnly => {
             format!("{}%", percentage)
         }
-        super::DisplayFormat::Compact => {
+        DisplayFormat::Compact => {
             format!("{}%", percentage)
         }
         _ => format!("{}%", percentage),
@@ -59,16 +60,16 @@ pub fn format_percentage(percentage: u8, format: &super::DisplayFormat, emoji: &
 }
 
 /// Format a token ratio (current/max) based on display format  
-pub fn format_token_ratio(current: i64, max_tokens: Option<i64>, format: &super::DisplayFormat, emoji: &Option<String>) -> String {
+pub fn format_token_ratio(current: i64, max_tokens: Option<i64>, format: &DisplayFormat, emoji: &Option<String>) -> String {
     match format {
-        super::DisplayFormat::Ratio => {
+        DisplayFormat::Ratio => {
             if let Some(max) = max_tokens {
                 format!("{}/{}", format_number_compact(current), format_number_compact(max))
             } else {
                 format_number_compact(current)
             }
         }
-        super::DisplayFormat::TextWithEmoji => {
+        DisplayFormat::TextWithEmoji => {
             let emoji_str = emoji.as_deref().unwrap_or("🧠");
             if let Some(max) = max_tokens {
                 format!("{} {}/{}", emoji_str, format_number_compact(current), format_number_compact(max))
@@ -87,32 +88,32 @@ pub fn format_token_ratio(current: i64, max_tokens: Option<i64>, format: &super:
 }
 
 /// Format a duration based on display format
-pub fn format_duration_display(duration: Duration, format: &super::DisplayFormat, emoji: &Option<String>) -> String {
+pub fn format_duration_display(duration: Duration, format: &DisplayFormat, emoji: &Option<String>) -> String {
     let duration_str = format_duration_human(duration);
     
     match format {
-        super::DisplayFormat::Text => duration_str,
-        super::DisplayFormat::TextWithEmoji => {
+        DisplayFormat::Text => duration_str,
+        DisplayFormat::TextWithEmoji => {
             let emoji_str = emoji.as_deref().unwrap_or("⏱️");
             format!("{} {}", emoji_str, duration_str)
         }
-        super::DisplayFormat::Compact => {
+        DisplayFormat::Compact => {
             format_duration_compact(duration)
         }
-        super::DisplayFormat::Duration => duration_str,
+        DisplayFormat::Duration => duration_str,
         _ => duration_str,
     }
 }
 
 /// Format model name based on display format
-pub fn format_model(model: &str, format: &super::DisplayFormat, emoji: &Option<String>) -> String {
+pub fn format_model(model: &str, format: &DisplayFormat, emoji: &Option<String>) -> String {
     match format {
-        super::DisplayFormat::Text => model.to_string(),
-        super::DisplayFormat::TextWithEmoji => {
+        DisplayFormat::Text => model.to_string(),
+        DisplayFormat::TextWithEmoji => {
             let emoji_str = emoji.as_deref().unwrap_or("🤖");
             format!("{} {}", emoji_str, model)
         }
-        super::DisplayFormat::Compact => {
+        DisplayFormat::Compact => {
             // Just use first 3 chars for compact
             model.chars().take(3).collect()
         }
@@ -123,11 +124,11 @@ pub fn format_model(model: &str, format: &super::DisplayFormat, emoji: &Option<S
 /// Format block status based on current state
 pub fn format_block_status(
     status: &crate::analyze::BlockStatus, 
-    format: &super::DisplayFormat,
+    format: &DisplayFormat,
     remaining_time: Option<Duration>
 ) -> String {
     match format {
-        super::DisplayFormat::StatusIcon => {
+        DisplayFormat::StatusIcon => {
             match status {
                 crate::analyze::BlockStatus::InCurrentBlock => "🟢".to_string(),
                 crate::analyze::BlockStatus::NeedNewBlock | 
@@ -135,7 +136,7 @@ pub fn format_block_status(
                 crate::analyze::BlockStatus::NoCurrentBlock => "🟡".to_string(),
             }
         }
-        super::DisplayFormat::Text => {
+        DisplayFormat::Text => {
             match status {
                 crate::analyze::BlockStatus::InCurrentBlock => {
                     if let Some(remaining) = remaining_time {
@@ -149,7 +150,7 @@ pub fn format_block_status(
                 crate::analyze::BlockStatus::NoCurrentBlock => "NO BLOCK".to_string(),
             }
         }
-        _ => format_block_status(status, &super::DisplayFormat::Text, remaining_time),
+        _ => format_block_status(status, &DisplayFormat::Text, remaining_time),
     }
 }
 
@@ -220,14 +221,10 @@ fn format_progress_bar(percentage: u8, label: Option<String>) -> String {
 }
 
 fn percentage_color(percentage: u8) -> &'static str {
-    if should_use_colors_for_status() {
-        match percentage {
-            0..=49 => GREEN,
-            50..=79 => YELLOW, 
-            _ => RED,
-        }
-    } else {
-        ""
+    match percentage {
+        0..=49 => GREEN,
+        50..=79 => YELLOW,
+        _ => RED,
     }
 }
 

@@ -1,6 +1,6 @@
 mod common;
 
-use rs_claude_bar::claudebar_types::{group_by_project, ProjectStats, RoleStats};
+use crateclaudebar_types::{group_by_project, ProjectStats, RoleStats};
 
 #[test]
 fn test_data_folder_stats() {

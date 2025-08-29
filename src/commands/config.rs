@@ -1,9 +1,14 @@
 use std::io::{self, Write};
-use rs_claude_bar::{colors::*, StatType, DisplayFormat, DisplayItem};
-use rs_claude_bar::config_manager::save_config;
-use crate::cli::ConfigCommands;
 
-pub fn run(config_cmd: Option<ConfigCommands>, config: &rs_claude_bar::ConfigInfo) {
+use crate::{
+    common::colors::*,
+    display::items::{StatType, DisplayFormat, DisplayItem},
+    config_manager::save_config,
+    cli::ConfigCommands,
+    claudebar_types::ConfigInfo
+};
+
+pub fn run(config_cmd: Option<ConfigCommands>, config: &ConfigInfo) {
     match config_cmd {
         Some(ConfigCommands::ClaudePath) => configure_claude_path(config),
         Some(ConfigCommands::Display) => configure_display(config),
@@ -33,23 +38,23 @@ fn show_config_help() {
     ~/.claude-bar/config.json
 
 "#,
-        bold = if should_use_colors() { BOLD } else { "" },
-        reset = if should_use_colors() { RESET } else { "" },
-        cyan = if should_use_colors() { CYAN } else { "" },
-        green = if should_use_colors() { GREEN } else { "" },
-        gray = if should_use_colors() { GRAY } else { "" },
+        bold = { BOLD },
+        reset = { RESET },
+        cyan = { CYAN },
+        green = { GREEN },
+        gray = { GRAY },
     );
 
     print!("{}", help_text);
 }
 
-fn configure_claude_path(config: &rs_claude_bar::ConfigInfo) {
+fn configure_claude_path(config: &ConfigInfo) {
     let mut config = config.clone();
     
     println!("{bold}{cyan}🔧 Configure Claude Data Path{reset}",
-        bold = if should_use_colors() { BOLD } else { "" },
-        cyan = if should_use_colors() { CYAN } else { "" },
-        reset = if should_use_colors() { RESET } else { "" },
+        bold = { BOLD },
+        cyan = { CYAN },
+        reset = { RESET },
     );
     
     println!();
@@ -59,8 +64,8 @@ fn configure_claude_path(config: &rs_claude_bar::ConfigInfo) {
     
     println!("Current path: {yellow}{}{reset}", 
         config.claude_data_path,
-        yellow = if should_use_colors() { YELLOW } else { "" },
-        reset = if should_use_colors() { RESET } else { "" },
+        yellow = { YELLOW },
+        reset = { RESET },
     );
     
     print!("Enter new path to Claude data directory (or press Enter to keep current): ");
@@ -85,52 +90,52 @@ fn configure_claude_path(config: &rs_claude_bar::ConfigInfo) {
                     Ok(_) => {
                         println!("{green}✓{reset} Path updated to: {yellow}{}{reset}",
                             config.claude_data_path,
-                            green = if should_use_colors() { GREEN } else { "" },
-                            yellow = if should_use_colors() { YELLOW } else { "" },
-                            reset = if should_use_colors() { RESET } else { "" },
+                            green = { GREEN },
+                            yellow = { YELLOW },
+                            reset = { RESET },
                         );
                     }
                     Err(e) => {
                         println!("{red}✗{reset} Failed to save config: {}",
                             e,
-                            red = if should_use_colors() { RED } else { "" },
-                            reset = if should_use_colors() { RESET } else { "" },
+                            red = { RED },
+                            reset = { RESET },
                         );
                     }
                 }
             } else {
                 println!("{red}✗{reset} Path does not exist: {}",
                     trimmed_input,
-                    red = if should_use_colors() { RED } else { "" },
-                    reset = if should_use_colors() { RESET } else { "" },
+                    red = { RED },
+                    reset = { RESET },
                 );
             }
         }
         Err(e) => {
             println!("{red}✗{reset} Error reading input: {}",
                 e,
-                red = if should_use_colors() { RED } else { "" },
-                reset = if should_use_colors() { RESET } else { "" },
+                red = { RED },
+                reset = { RESET },
             );
         }
     }
 }
 
-fn configure_display(config: &rs_claude_bar::ConfigInfo) {
+fn configure_display(config: &ConfigInfo) {
     let mut config = config.clone();
     
     println!("{bold}{cyan}🎨 Configure Display Settings{reset}",
-        bold = if should_use_colors() { BOLD } else { "" },
-        cyan = if should_use_colors() { CYAN } else { "" },
-        reset = if should_use_colors() { RESET } else { "" },
+        bold = { BOLD },
+        cyan = { CYAN },
+        reset = { RESET },
     );
     println!();
     
     loop {
         // Show current display items
         println!("{bold}Current Display Items:{reset}",
-            bold = if should_use_colors() { BOLD } else { "" },
-            reset = if should_use_colors() { RESET } else { "" },
+            bold = { BOLD },
+            reset = { RESET },
         );
         
         for (i, item) in config.display.items.iter().enumerate() {
@@ -142,7 +147,7 @@ fn configure_display(config: &rs_claude_bar::ConfigInfo) {
             
             println!("  {}. {} {:?} ({:?})", 
                 i + 1, 
-                if should_use_colors() { enabled_indicator } else { if item.enabled { "✓" } else { "✗" }.to_string() },
+                if item.enabled { "✓" } else { "✗" }.to_string(),
                 item.stat_type, 
                 item.format
             );
@@ -152,21 +157,21 @@ fn configure_display(config: &rs_claude_bar::ConfigInfo) {
         println!("Actions:");
         println!("  {green}1-{}{reset} Toggle enable/disable for item", 
             config.display.items.len(),
-            green = if should_use_colors() { GREEN } else { "" },
-            reset = if should_use_colors() { RESET } else { "" },
+            green = { GREEN },
+            reset = { RESET },
         );
         println!("  {green}a{reset} Add new display item",
-            green = if should_use_colors() { GREEN } else { "" },
-            reset = if should_use_colors() { RESET } else { "" },
+            green = { GREEN },
+            reset = { RESET },
         );
         println!("  {green}s{reset} Change separator (current: \"{}\")",
             config.display.separator,
-            green = if should_use_colors() { GREEN } else { "" },
-            reset = if should_use_colors() { RESET } else { "" },
+            green = { GREEN },
+            reset = { RESET },
         );
         println!("  {green}q{reset} Save and quit",
-            green = if should_use_colors() { GREEN } else { "" },
-            reset = if should_use_colors() { RESET } else { "" },
+            green = { GREEN },
+            reset = { RESET },
         );
         
         print!("\nChoice: ");
@@ -184,15 +189,15 @@ fn configure_display(config: &rs_claude_bar::ConfigInfo) {
             match save_config(&config) {
                 Ok(_) => {
                     println!("{green}✓{reset} Display configuration saved!",
-                        green = if should_use_colors() { GREEN } else { "" },
-                        reset = if should_use_colors() { RESET } else { "" },
+                        green = { GREEN },
+                        reset = { RESET },
                     );
                 }
                 Err(e) => {
                     println!("{red}✗{reset} Failed to save config: {}",
                         e,
-                        red = if should_use_colors() { RED } else { "" },
-                        reset = if should_use_colors() { RESET } else { "" },
+                        red = { RED },
+                        reset = { RESET },
                     );
                 }
             }
@@ -214,7 +219,7 @@ fn configure_display(config: &rs_claude_bar::ConfigInfo) {
     }
 }
 
-fn add_display_item(config: &mut rs_claude_bar::ConfigInfo) {
+fn add_display_item(config: &mut ConfigInfo) {
     println!("Available stat types:");
     let stat_types = [
         StatType::TokenUsage,
@@ -279,7 +284,7 @@ fn add_display_item(config: &mut rs_claude_bar::ConfigInfo) {
     }
 }
 
-fn configure_separator(config: &mut rs_claude_bar::ConfigInfo) {
+fn configure_separator(config: &mut ConfigInfo) {
     print!("Enter new separator (current: \"{}\"): ", config.display.separator);
     io::stdout().flush().unwrap();
     

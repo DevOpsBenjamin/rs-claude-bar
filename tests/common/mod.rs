@@ -1,8 +1,11 @@
 use chrono::{DateTime, Utc};
-use rs_claude_bar::claude_types::TranscriptEntry;
-use rs_claude_bar::claudebar_types::ClaudeBarUsageEntry;
 use std::fs;
 use std::path::Path;
+
+use crate::{
+    claude_types::TranscriptEntry,
+    claudebar_types::ClaudeBarUsageEntry
+};
 
 /// Load entries from a test data directory
 pub fn load_test_entries(data_path: &str) -> Vec<ClaudeBarUsageEntry> {

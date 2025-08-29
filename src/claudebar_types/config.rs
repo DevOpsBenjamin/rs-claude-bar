@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
 use std::env;
-use crate::display::{DisplayItem, StatType, DisplayFormat};
+use crate::display::items::{DisplayItem, StatType, DisplayFormat};
 
 /// Simple block for stats storage
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -1,7 +1,12 @@
 use chrono::{DateTime, Utc};
-use rs_claude_bar::claude_types::Entry;
-use rs_claude_bar::colors::*;
-use rs_claude_bar::claudebar_types::ClaudeBarUsageEntry;
+use crate::{
+    claude_types::transcript_entry::Entry,
+    common::colors::*,
+    claudebar_types::{
+        config::ConfigInfo,
+        usage_entry::ClaudeBarUsageEntry
+    }
+};
 use std::fs;
 use std::path::Path;
 
@@ -16,7 +21,7 @@ struct FileParseStats {
     total_output_tokens: u32,
 }
 
-pub fn run(config: &rs_claude_bar::ConfigInfo, parse: bool, file: Option<String>, blocks: bool, gaps: bool, limits: bool) {
+pub fn run(config: &ConfigInfo, parse: bool, file: Option<String>, blocks: bool, gaps: bool, limits: bool) {
     let base_path = format!("{}/projects", config.claude_data_path);
     let path = Path::new(&base_path);
 
@@ -40,9 +45,9 @@ pub fn run(config: &rs_claude_bar::ConfigInfo, parse: bool, file: Option<String>
 fn run_parse_debug(base_path: &str) {
     println!(
         "{bold}{cyan}🔍 DEBUG: JSONL Parse Analysis{reset}",
-        bold = if should_use_colors() { BOLD } else { "" },
-        cyan = if should_use_colors() { CYAN } else { "" },
-        reset = if should_use_colors() { RESET } else { "" },
+        bold = { BOLD },
+        cyan = { CYAN },
+        reset = { RESET },
     );
     println!();
 
@@ -139,23 +144,23 @@ fn print_table_header() {
 
     println!(
         "{bold}{header_sep}{reset}",
-        bold = if should_use_colors() { BOLD } else { "" },
+        bold = { BOLD },
         header_sep = header_sep,
-        reset = if should_use_colors() { RESET } else { "" },
+        reset = { RESET },
     );
     
     println!(
         "{bold}{header_row}{reset}",
-        bold = if should_use_colors() { BOLD } else { "" },
+        bold = { BOLD },
         header_row = header_row,
-        reset = if should_use_colors() { RESET } else { "" },
+        reset = { RESET },
     );
     
     println!(
         "{bold}{header_div}{reset}",
-        bold = if should_use_colors() { BOLD } else { "" },
+        bold = { BOLD },
         header_div = header_div,
-        reset = if should_use_colors() { RESET } else { "" },
+        reset = { RESET },
     );
 }
 
@@ -182,7 +187,7 @@ fn print_file_stats(file_path: &str, stats: &FileParseStats) {
     };
 
     // Color coding based on success rate
-    let (color, reset) = if should_use_colors() {
+    let (color, reset) = {
         if success_rate >= 95.0 {
             (GREEN, RESET)
         } else if success_rate >= 80.0 {
@@ -190,8 +195,6 @@ fn print_file_stats(file_path: &str, stats: &FileParseStats) {
         } else {
             (RED, RESET)
         }
-    } else {
-        ("", "")
     };
 
     println!(
@@ -214,9 +217,9 @@ fn print_table_footer() {
     
     println!(
         "{bold}{footer}{reset}",
-        bold = if should_use_colors() { BOLD } else { "" },
+        bold = { BOLD },
         footer = footer,
-        reset = if should_use_colors() { RESET } else { "" },
+        reset = { RESET },
     );
 }
 
@@ -246,9 +249,9 @@ fn print_summary(all_file_stats: &[(String, FileParseStats)]) {
     println!();
     println!(
         "{bold}{green}📊 Summary:{reset}",
-        bold = if should_use_colors() { BOLD } else { "" },
-        green = if should_use_colors() { GREEN } else { "" },
-        reset = if should_use_colors() { RESET } else { "" },
+        bold = { BOLD },
+        green = { GREEN },
+        reset = { RESET },
     );
     
     println!("   Files processed: {}", total_files);
@@ -281,9 +284,9 @@ fn print_summary(all_file_stats: &[(String, FileParseStats)]) {
         println!();
         println!(
             "{bold}{yellow}⚠️  Files with parsing issues:{reset}",
-            bold = if should_use_colors() { BOLD } else { "" },
-            yellow = if should_use_colors() { YELLOW } else { "" },
-            reset = if should_use_colors() { RESET } else { "" },
+            bold = { BOLD },
+            yellow = { YELLOW },
+            reset = { RESET },
         );
         
         for (file_path, stats) in problematic_files {
@@ -298,9 +301,9 @@ fn print_summary(all_file_stats: &[(String, FileParseStats)]) {
 fn run_single_file_debug(base_path: &str, target_file: &str) {
     println!(
         "{bold}{cyan}🔍 DEBUG: Single File Parse Analysis{reset}",
-        bold = if should_use_colors() { BOLD } else { "" },
-        cyan = if should_use_colors() { CYAN } else { "" },
-        reset = if should_use_colors() { RESET } else { "" },
+        bold = { BOLD },
+        cyan = { CYAN },
+        reset = { RESET },
     );
     println!("Target file: {}", target_file);
     println!();
@@ -325,8 +328,8 @@ fn run_single_file_debug(base_path: &str, target_file: &str) {
                                 println!(
                                     "{bold}📄 Analyzing: {}{reset}",
                                     file_path,
-                                    bold = if should_use_colors() { BOLD } else { "" },
-                                    reset = if should_use_colors() { RESET } else { "" },
+                                    bold = { BOLD },
+                                    reset = { RESET },
                                 );
                                 println!();
                                 
@@ -396,8 +399,8 @@ fn analyze_single_file_with_errors(content: &str, _file_path: &str) {
     // Print file stats
     println!(
         "{bold}📊 File Statistics:{reset}",
-        bold = if should_use_colors() { BOLD } else { "" },
-        reset = if should_use_colors() { RESET } else { "" },
+        bold = { BOLD },
+        reset = { RESET },
     );
     println!("   Total lines: {}", stats.total_lines);
     println!("   Successfully parsed: {}", stats.successful_parses);
@@ -426,9 +429,9 @@ fn analyze_single_file_with_errors(content: &str, _file_path: &str) {
         println!(
             "{bold}{red}❌ Parse Errors ({} total):{reset}",
             parse_errors.len(),
-            bold = if should_use_colors() { BOLD } else { "" },
-            red = if should_use_colors() { RED } else { "" },
-            reset = if should_use_colors() { RESET } else { "" },
+            bold = { BOLD },
+            red = { RED },
+            reset = { RESET },
         );
         println!();
 
@@ -436,8 +439,8 @@ fn analyze_single_file_with_errors(content: &str, _file_path: &str) {
             println!(
                 "{bold}Line {}:{reset}",
                 line_num,
-                bold = if should_use_colors() { BOLD } else { "" },
-                reset = if should_use_colors() { RESET } else { "" },
+                bold = { BOLD },
+                reset = { RESET },
             );
             println!("  Error: {}", error);
             
@@ -476,9 +479,9 @@ fn analyze_single_file_with_errors(content: &str, _file_path: &str) {
         // Provide suggestions
         println!(
             "{bold}{yellow}💡 Parsing Suggestions:{reset}",
-            bold = if should_use_colors() { BOLD } else { "" },
-            yellow = if should_use_colors() { YELLOW } else { "" },
-            reset = if should_use_colors() { RESET } else { "" },
+            bold = { BOLD },
+            yellow = { YELLOW },
+            reset = { RESET },
         );
         
         // Analyze common error patterns
@@ -512,9 +515,9 @@ fn analyze_single_file_with_errors(content: &str, _file_path: &str) {
         println!();
         println!(
             "{bold}{green}✅ All lines parsed successfully!{reset}",
-            bold = if should_use_colors() { BOLD } else { "" },
-            green = if should_use_colors() { GREEN } else { "" },
-            reset = if should_use_colors() { RESET } else { "" },
+            bold = { BOLD },
+            green = { GREEN },
+            reset = { RESET },
         );
     }
 }
@@ -555,7 +558,7 @@ fn format_number_with_separators(num: u32) -> String {
     result
 }
 
-fn run_blocks_debug(config: &rs_claude_bar::ConfigInfo, gaps: bool, limits: bool) {
+fn run_blocks_debug(config: &ConfigInfo, gaps: bool, limits: bool) {
     // Load entries directly and implement debug functionality here
     let base_path = format!("{}/projects", config.claude_data_path);
     let all_entries = load_usage_entries(&base_path);
@@ -693,9 +696,9 @@ struct UsageBlock {
 fn print_limits_debug(all_entries: &[ClaudeBarUsageEntry]) {
     println!(
         "{bold}{purple}🔍 DEBUG: Limit Messages{reset}",
-        bold = if should_use_colors() { BOLD } else { "" },
-        purple = if should_use_colors() { PURPLE } else { "" },
-        reset = if should_use_colors() { RESET } else { "" },
+        bold = { BOLD },
+        purple = { PURPLE },
+        reset = { RESET },
     );
     println!();
 
@@ -723,16 +726,16 @@ fn print_limits_debug(all_entries: &[ClaudeBarUsageEntry]) {
     println!(
         "{green}✅ Found {} limit messages{reset}",
         limit_entries.len(),
-        green = if should_use_colors() { GREEN } else { "" },
-        reset = if should_use_colors() { RESET } else { "" },
+        green = { GREEN },
+        reset = { RESET },
     );
 }
 
 fn print_blocks_debug(blocks: &[UsageBlock], _all_entries: &[ClaudeBarUsageEntry]) {
     println!("{bold}{cyan}🔍 DEBUG: FIXED 5-Hour Windows Analysis{reset}",
-        bold = if should_use_colors() { BOLD } else { "" },
-        cyan = if should_use_colors() { CYAN } else { "" },
-        reset = if should_use_colors() { RESET } else { "" },
+        bold = { BOLD },
+        cyan = { CYAN },
+        reset = { RESET },
     );
     println!();
     
@@ -753,8 +756,8 @@ fn print_blocks_debug(blocks: &[UsageBlock], _all_entries: &[ClaudeBarUsageEntry
             i + 1,
             block.start_time.format("%m-%d %H:%M"),
             block.end_time.unwrap_or(chrono::Utc::now()).format("%m-%d %H:%M"),
-            bold = if should_use_colors() { BOLD } else { "" },
-            reset = if should_use_colors() { RESET } else { "" },
+            bold = { BOLD },
+            reset = { RESET },
         );
         
         println!("  Total entries: {}", block.entries.len());
@@ -764,16 +767,16 @@ fn print_blocks_debug(blocks: &[UsageBlock], _all_entries: &[ClaudeBarUsageEntry
 
     println!("{green}✅ Found {} FIXED windows with confirmed limits{reset}",
         fixed_blocks.len(),
-        green = if should_use_colors() { GREEN } else { "" },
-        reset = if should_use_colors() { RESET } else { "" },
+        green = { GREEN },
+        reset = { RESET },
     );
 }
 
 fn print_gaps_debug(blocks: &[UsageBlock]) {
     println!("{bold}{yellow}🕳️  DEBUG: Gap Analysis (Sessions){reset}",
-        bold = if should_use_colors() { BOLD } else { "" },
-        yellow = if should_use_colors() { YELLOW } else { "" },
-        reset = if should_use_colors() { RESET } else { "" },
+        bold = { BOLD },
+        yellow = { YELLOW },
+        reset = { RESET },
     );
     println!();
     
@@ -787,16 +790,16 @@ fn print_gaps_debug(blocks: &[UsageBlock]) {
     }
     
     println!("{bold}┌─────────────────────┬─────────────────────┬──────────┬─────────┬────────────┐{reset}",
-        bold = if should_use_colors() { BOLD } else { "" },
-        reset = if should_use_colors() { RESET } else { "" },
+        bold = { BOLD },
+        reset = { RESET },
     );
     println!("{bold}│ Session Start       │ Session End         │ Duration │ Entries │ Status     │{reset}",
-        bold = if should_use_colors() { BOLD } else { "" },
-        reset = if should_use_colors() { RESET } else { "" },
+        bold = { BOLD },
+        reset = { RESET },
     );
     println!("{bold}├─────────────────────┼─────────────────────┼──────────┼─────────┼────────────┤{reset}",
-        bold = if should_use_colors() { BOLD } else { "" },
-        reset = if should_use_colors() { RESET } else { "" },
+        bold = { BOLD },
+        reset = { RESET },
     );
     
     for block in &session_blocks {
@@ -832,14 +835,14 @@ fn print_gaps_debug(blocks: &[UsageBlock]) {
     }
     
     println!("{bold}└─────────────────────┴─────────────────────┴──────────┴─────────┴────────────┘{reset}",
-        bold = if should_use_colors() { BOLD } else { "" },
-        reset = if should_use_colors() { RESET } else { "" },
+        bold = { BOLD },
+        reset = { RESET },
     );
     
     println!();
     println!("{yellow}📝 Note: These are estimated session boundaries based on gaps > 1 hour{reset}",
-        yellow = if should_use_colors() { YELLOW } else { "" },
-        reset = if should_use_colors() { RESET } else { "" },
+        yellow =  { YELLOW },
+        reset = { RESET },
     );
 }
 

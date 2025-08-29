@@ -1,12 +1,20 @@
+mod analyze;
+mod claude_types;
+mod claudebar_types;
 mod cli;
 mod commands;
+mod common;
+mod config_manager;
+mod display;
+mod status;
 
 use clap::Parser;
 use cli::{Cli, Commands};
+use crate::config_manager::config_loader::*;
 
 fn main() {
     // Initialize configuration (creates folder and file if needed)
-    let config = rs_claude_bar::initialize_config();
+    let config = initialize_config();
 
     // Parse CLI first to see if we have a specific command
     let cli = Cli::parse();

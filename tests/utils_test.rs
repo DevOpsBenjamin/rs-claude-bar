@@ -1,5 +1,5 @@
 use chrono::Duration;
-use rs_claude_bar::utils::{format_duration, format_model_name, format_token_count};
+use crateutils::{format_duration, format_model_name, format_token_count};
 
 #[test]
 fn test_format_duration() {

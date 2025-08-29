@@ -17,30 +17,6 @@ pub fn format_duration(duration: Duration) -> String {
     }
 }
 
-/// Simplify common model names for status line display
-pub fn format_model_name(display_name: &str) -> String {
-    // Simplify common model names for status line
-    if display_name.contains("Sonnet") {
-        if display_name.contains("3.5") {
-            "Sonnet 3.5".to_string()
-        } else if display_name.contains("4") {
-            "Sonnet 4".to_string()
-        } else {
-            "Sonnet".to_string()
-        }
-    } else if display_name.contains("Opus") {
-        if display_name.contains("4") {
-            "Opus 4".to_string()
-        } else {
-            "Opus".to_string()
-        }
-    } else if display_name.contains("Haiku") {
-        "Haiku".to_string()
-    } else {
-        display_name.to_string()
-    }
-}
-
 /// Format token count in human-readable format (e.g., "1.2M", "500k", "123")
 pub fn format_token_count(tokens: u32) -> String {
     if tokens >= 1_000_000 {

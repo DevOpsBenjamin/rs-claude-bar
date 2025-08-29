@@ -1,15 +1,31 @@
 use chrono::{Utc, Duration, DateTime, Timelike};
-use rs_claude_bar::{
-    claudebar_types::{GuessBlock, ClaudeBarUsageEntry, SimpleBlock, StatsFile},
+use std::path::Path;
+
+use crate::{
+    claudebar_types::{
+        config::{
+            ConfigInfo,          
+            StatsFile,
+            SimpleBlock,
+        },
+        usage_entry::{ 
+            UserRole,
+            ClaudeBarUsageEntry,
+        },
+        blocks::{
+            GuessBlock,
+        },
+    },
     analyze::{
+        parse_reset_time,
         load_entries_since,
-        build_guess_blocks_from_entries,
         detect_block_status,
+        calculate_unlock_time,
+        build_guess_blocks_from_entries,
         BlockStatus,
     },
     config_manager::{load_stats, save_stats},
 };
-use std::path::Path;
 
 /// Round a timestamp to the current hour boundary (00:00 minutes/seconds)
 fn round_to_hour_boundary(dt: DateTime<Utc>) -> DateTime<Utc> {
@@ -23,7 +39,7 @@ fn round_to_hour_boundary(dt: DateTime<Utc>) -> DateTime<Utc> {
 // "<end UTC> | <start UTC>" where start = end - 5h
 
 /// Silent version of run() for status command auto-refresh
-pub fn refresh_stats_for_status(config: &rs_claude_bar::ConfigInfo) {
+pub fn refresh_stats_for_status(config: &ConfigInfo) {
     let base_path = format!("{}/projects", config.claude_data_path);
     let path = Path::new(&base_path);
     if !path.exists() {
@@ -61,7 +77,7 @@ pub fn refresh_stats_for_status(config: &rs_claude_bar::ConfigInfo) {
     let _ = save_stats(&stats);
 }
 
-pub fn run(config: &rs_claude_bar::ConfigInfo) {
+pub fn run(config: &ConfigInfo) {
     let base_path = format!("{}/projects", config.claude_data_path);
     let path = Path::new(&base_path);
     if !path.exists() {
@@ -156,7 +172,7 @@ pub fn run(config: &rs_claude_bar::ConfigInfo) {
             // Try to find reset time from recent limit entries
             if let Some(reset_time) = find_reset_time_from_entries(&limit_entries) {
                 // Calculate next block start from reset time
-                if let Some(next_start) = rs_claude_bar::analyze::calculate_unlock_time(now, &reset_time) {
+                if let Some(next_start) = calculate_unlock_time(now, &reset_time) {
                     let next_end = next_start + Duration::hours(5);
                     stats.current = Some(SimpleBlock {
                         start: next_start,
@@ -290,7 +306,7 @@ fn find_reset_time_from_entries(entries: &[ClaudeBarUsageEntry]) -> Option<Strin
     // Find the most recent limit entry with reset time
     for entry in entries.iter() {
         if let Some(content) = &entry.content_text {
-            if let Some(reset_time) = rs_claude_bar::analyze::parse_reset_time(content) {
+            if let Some(reset_time) = parse_reset_time(content) {
                 return Some(reset_time);
             }
         }
@@ -300,7 +316,6 @@ fn find_reset_time_from_entries(entries: &[ClaudeBarUsageEntry]) -> Option<Strin
 
 /// Update token counts for blocks based on entries
 fn update_block_tokens(stats: &mut StatsFile, entries: &[ClaudeBarUsageEntry]) {
-    use rs_claude_bar::claudebar_types::UserRole;
     
     for entry in entries {
         if !matches!(entry.role, UserRole::Assistant) {

@@ -4,7 +4,7 @@ use regex::Regex;
 use std::{fs, path::Path, collections::HashMap};
 
 use crate::{
-    claude_types::TranscriptEntry,
+    claude_types::transcript_entry::TranscriptEntry,
     claudebar_types::{AssistantInfo, CurrentBlock, GuessBlock, UserInfo, ClaudeBarUsageEntry},
 };
 

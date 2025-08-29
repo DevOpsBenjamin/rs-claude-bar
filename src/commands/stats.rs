@@ -1,12 +1,20 @@
 use tabled::{Table, Tabled};
 
+use crate::{
+    common::colors::*,
+    claudebar_types::{
+        config::ConfigInfo
+    }
+};
+
+
 #[derive(Tabled)]
 struct StatRow {
     metric: &'static str,
     value: &'static str,
 }
 
-pub fn run(_config: &rs_claude_bar::ConfigInfo) {
+pub fn run(_config: &ConfigInfo) {
     let data = [
         StatRow {
             metric: "Total Tokens",

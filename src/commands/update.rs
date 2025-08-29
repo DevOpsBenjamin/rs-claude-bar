@@ -1,4 +1,6 @@
-pub fn run(_config: &rs_claude_bar::ConfigInfo) {
+use crate::claudebar_types::ConfigInfo;
+
+pub fn run(_config: &ConfigInfo) {
     println!("🔄 Forcing stats update... (placeholder)");
 }
 

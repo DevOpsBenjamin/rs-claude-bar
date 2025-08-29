@@ -1,6 +1,29 @@
-pub fn run(config: &rs_claude_bar::ConfigInfo) {
+use std::path::Path;
+use chrono::{Utc, Duration};
+
+use crate::{
+    analyze::{
+        detect_block_status,
+        BlockStatus,
+        load_entries_since
+    },
+    config_manager::{
+        load_stats, 
+        save_stats
+    },
+    config_manager::config_loader,
+    claudebar_types::{
+        config::{StatsFile},
+        usage_entry::{ 
+            ClaudeBarUsageEntry, 
+            UserRole
+        }
+    }
+};
+
+pub fn run(config: &ConfigInfo) {
     // Check if stats need refreshing (older than 5 seconds)  
-    let stats = rs_claude_bar::load_stats();
+    let stats = crate::load_stats();
     let now = chrono::Utc::now();
     let should_refresh = stats.last_processed
         .map(|last| now.signed_duration_since(last).num_seconds() > 5)
@@ -14,25 +37,17 @@ pub fn run(config: &rs_claude_bar::ConfigInfo) {
     }
     
     // Try to get Claude Code input for model info
-    let model_name = rs_claude_bar::parse_claude_input()
+    let model_name = parse_claude_input()
         .map(|input| input.model.display_name);
     
-    match rs_claude_bar::generate_status_with_config_and_model(config, model_name) {
+    match generate_status_with_config_and_model(config, model_name) {
         Ok(status) => print!("{}", status),
         Err(err) => eprintln!("Error generating status: {}", err),
     }
 }
 
 /// Refresh stats silently (no output) if needed
-fn refresh_stats_silently(config: &rs_claude_bar::ConfigInfo) -> Result<(), Box<dyn std::error::Error>> {
-    use rs_claude_bar::{
-        claudebar_types::{ClaudeBarUsageEntry, StatsFile},
-        analyze::load_entries_since,
-        config_manager::{load_stats, save_stats},
-    };
-    use std::path::Path;
-    use chrono::{Utc, Duration};
-    
+fn refresh_stats_silently(config: &ConfigInfo) -> Result<(), Box<dyn std::error::Error>> {   
     let base_path = format!("{}/projects", config.claude_data_path);
     let path = Path::new(&base_path);
     if !path.exists() {
@@ -61,18 +76,16 @@ fn refresh_stats_silently(config: &rs_claude_bar::ConfigInfo) -> Result<(), Box<
 
 // Helper functions (simplified from resets command)
 fn update_stats_with_blocks(
-    stats: &mut rs_claude_bar::claudebar_types::StatsFile,
+    stats: &mut StatsFile,
     now: chrono::DateTime<chrono::Utc>
-) {
-    use rs_claude_bar::analyze::{detect_block_status, BlockStatus};
-    
+) {   
     let block_status = detect_block_status(now, &stats.current);
     
     // Simple logic: if no current block, create one starting now
     if matches!(block_status, BlockStatus::NoCurrentBlock) {
         let current_start = round_to_hour_boundary(now);
         let current_end = current_start + chrono::Duration::hours(5);
-        stats.current = Some(rs_claude_bar::claudebar_types::SimpleBlock {
+        stats.current = Some(SimpleBlock {
             start: current_start,
             end: current_end,
             tokens: 0,
@@ -82,8 +95,8 @@ fn update_stats_with_blocks(
     stats.last_processed = Some(now);
 }
 
-fn update_block_tokens(stats: &mut rs_claude_bar::claudebar_types::StatsFile, entries: &[rs_claude_bar::claudebar_types::ClaudeBarUsageEntry]) {
-    use rs_claude_bar::claudebar_types::UserRole;
+fn update_block_tokens(stats: &mut StatsFile, entries: &[ClaudeBarUsageEntry]) {
+    use UserRole;
     
     // Use same additive logic as resets command
     for entry in entries {

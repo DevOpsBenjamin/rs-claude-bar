@@ -1,74 +1,27 @@
-pub mod app_dirs;
+// Public modules that can be used as cratemodule_name::*
+pub mod analyze;
 pub mod claude_types;
 pub mod claudebar_types;
-pub mod colors;
-pub mod config;
 pub mod config_manager;
-pub mod parser;
-pub mod status;
-pub mod types;
-pub mod utils;
-pub mod analyze;
 pub mod display;
+pub mod status;
 
-pub use app_dirs::*;
-pub use claude_types::*;
-pub use claudebar_types::*;
-pub use colors::*;
-pub use config::{load_config, reset_config_interactive, Config};
-pub use config_manager::*;
-pub use parser::*;
-pub use status::{generate_status, generate_status_with_config, generate_status_with_config_and_model};
-pub use types::*;
-pub use utils::*;
-pub use analyze::*;
-pub use display::*;
-
-pub fn generate_claude_status() -> Result<String, Box<dyn std::error::Error>> {
-    status::generate_status()
+// Re-export utility modules for internal use
+pub mod colors {
+    pub use crate::common::colors::*;
+}
+pub mod utils {
+    pub use crate::common::utils::*;
+}
+pub mod app_dirs {
+    pub use crate::common::app_dirs::*;
 }
 
-pub fn parse_claude_input() -> Option<claude_types::ClaudeCodeInput> {
-    use std::io::{self, Read};
-    
-    if !atty::is(atty::Stream::Stdin) {
-        let mut input = String::new();
-        if io::stdin().read_to_string(&mut input).is_ok() {
-            if let Ok(parsed) = serde_json::from_str::<claude_types::ClaudeCodeInput>(&input) {
-                return Some(parsed);
-            }
-        }
-    }
-    None
-}
+// Private modules for internal use
+mod common;
 
-pub fn debug_output() -> String {
-    use colors::*;
+// Re-export commonly used items
+pub use common::*;
 
-    let sep = format!("{}|{}", GRAY, RESET);
-    format!(
-        "{}{}{} {}{}{} {} {}{} TEST{} {} {}{} TIME{} {} {}{} LEFT{} {} {}{} SONNET{}\n",
-        BOLD,
-        "🧠",
-        RESET,
-        GRAY,
-        "[use /context]",
-        RESET,
-        sep,
-        BLUE,
-        "💬",
-        RESET,
-        sep,
-        PURPLE,
-        "⏱️",
-        RESET,
-        sep,
-        RED,
-        "⏰",
-        RESET,
-        sep,
-        CYAN,
-        "🤖",
-        RESET
-    )
-}
+// Re-export the main configuration function
+pub use config_manager::initialize_config;

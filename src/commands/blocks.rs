@@ -1,10 +1,21 @@
-use chrono::{DateTime, Duration, Utc};
-use rs_claude_bar::analyze::{parse_reset_time, calculate_unlock_time};
-use rs_claude_bar::{
-    claude_types::TranscriptEntry, claudebar_types::ClaudeBarUsageEntry, colors::*,
-};
+
 use std::fs;
 use std::path::Path;
+use chrono::{DateTime, Duration, Utc};
+
+use crate::{
+    analyze::{
+        parse_reset_time, 
+        calculate_unlock_time,
+        helpers::load_all_entries
+    },
+    claude_types::transcript_entry::TranscriptEntry, 
+    claudebar_types::{
+        usage_entry::{ClaudeBarUsageEntry, UserRole},
+        config::ConfigInfo,
+    },
+    common::colors::*,
+};
 
 #[derive(Debug, Clone)]
 pub struct UsageBlock {
@@ -17,7 +28,7 @@ pub struct UsageBlock {
     pub unlock_time: Option<DateTime<Utc>>, // calculated unlock timestamp
     pub guessed: bool,
 }
-pub fn run(config: &rs_claude_bar::ConfigInfo, debug: bool, gaps: bool, limits: bool) {
+pub fn run(config: &ConfigInfo, debug: bool, gaps: bool, limits: bool) {
     let mut updated_config = config.clone();
     let base_path = format!("{}/projects", config.claude_data_path);
     let path = Path::new(&base_path);
@@ -29,15 +40,15 @@ pub fn run(config: &rs_claude_bar::ConfigInfo, debug: bool, gaps: bool, limits: 
 
     println!(
         "{bold}{cyan}📊 5-Hour Usage Blocks Analysis{reset}",
-        bold = if should_use_colors() { BOLD } else { "" },
-        cyan = if should_use_colors() { CYAN } else { "" },
-        reset = if should_use_colors() { RESET } else { "" },
+        bold = { BOLD },
+        cyan = { CYAN },
+        reset = { RESET },
     );
     println!();
 
     // Load ALL entries (blocks analysis needs historical data)
     let start_time = std::time::Instant::now();
-    let mut all_entries = rs_claude_bar::analyze::load_all_entries(&base_path);
+    let mut all_entries = helpers::load_all_entries(&base_path);
     
     if all_entries.is_empty() {
         println!("❌ No usage entries found in {}!", base_path);
@@ -78,31 +89,31 @@ pub fn run(config: &rs_claude_bar::ConfigInfo, debug: bool, gaps: bool, limits: 
     if debug {
         println!(
             "{bold}{yellow}⚠️  Blocks debug functionality has moved to the debug command{reset}",
-            bold = if should_use_colors() { BOLD } else { "" },
-            yellow = if should_use_colors() { YELLOW } else { "" },
-            reset = if should_use_colors() { RESET } else { "" },
+            bold = { BOLD },
+            yellow = { YELLOW },
+            reset = { RESET },
         );
         println!();
         println!("Use instead:");
         if gaps {
             println!("  {bold}debug --gaps{reset} - Show gaps analysis", 
-                bold = if should_use_colors() { BOLD } else { "" },
-                reset = if should_use_colors() { RESET } else { "" },
+                bold = { BOLD },
+                reset = { RESET },
             );
         } else if limits {
             println!("  {bold}debug --limits{reset} - Show limit messages analysis", 
-                bold = if should_use_colors() { BOLD } else { "" },
-                reset = if should_use_colors() { RESET } else { "" },
+                bold = { BOLD },
+                reset = { RESET },
             );
         } else {
             println!("  {bold}debug --blocks{reset} - Show blocks debug information", 
-                bold = if should_use_colors() { BOLD } else { "" },
-                reset = if should_use_colors() { RESET } else { "" },
+                bold = { BOLD },
+                reset = { RESET },
             );
         }
         println!("  {bold}debug --parse{reset} - Show JSONL parsing analysis", 
-            bold = if should_use_colors() { BOLD } else { "" },
-            reset = if should_use_colors() { RESET } else { "" },
+            bold = { BOLD },
+            reset = { RESET },
         );
         return;
     }
@@ -123,16 +134,16 @@ pub fn run(config: &rs_claude_bar::ConfigInfo, debug: bool, gaps: bool, limits: 
     
     // Print table header for current block + last 10 fixed blocks
     println!("{bold}┌──────┬─────────────┬─────────────┬──────────┬─────────┬────────────┬─────────┐{reset}",
-        bold = if should_use_colors() { BOLD } else { "" },
-        reset = if should_use_colors() { RESET } else { "" },
+        bold = { BOLD },
+        reset = { RESET },
     );
     println!("{bold}│ Type │ Start       │ End         │ Duration │ Tokens  │ Messages   │ Status  │{reset}",
-        bold = if should_use_colors() { BOLD } else { "" },
-        reset = if should_use_colors() { RESET } else { "" },
+        bold = { BOLD },
+        reset = { RESET },
     );
     println!("{bold}├──────┼─────────────┼─────────────┼──────────┼─────────┼────────────┼─────────┤{reset}",
-        bold = if should_use_colors() { BOLD } else { "" },
-        reset = if should_use_colors() { RESET } else { "" },
+        bold = { BOLD },
+        reset = { RESET },
     );
 
     // Show current session estimate first
@@ -167,7 +178,7 @@ pub fn run(config: &rs_claude_bar::ConfigInfo, debug: bool, gaps: bool, limits: 
             duration_str,
             total_tokens,
             current.assistant_count,
-            if should_use_colors() { &status } else { &format!("{:.0}%", percentage) }
+            { &status }
         );
     }
 
@@ -202,13 +213,13 @@ pub fn run(config: &rs_claude_bar::ConfigInfo, debug: bool, gaps: bool, limits: 
             duration_str,
             total_tokens,
             block.assistant_count,
-            if should_use_colors() { &status } else { reset_time }
+            { &status }
         );
     }
 
     println!("{bold}└──────┴─────────────┴─────────────┴──────────┴─────────┴────────────┴─────────┘{reset}",
-        bold = if should_use_colors() { BOLD } else { "" },
-        reset = if should_use_colors() { RESET } else { "" },
+        bold = { BOLD },
+        reset = { RESET },
     );
     
     // Update config with the latest block date for next run
@@ -220,7 +231,7 @@ pub fn run(config: &rs_claude_bar::ConfigInfo, debug: bool, gaps: bool, limits: 
         updated_config.last_limit_date = latest_real_block.end_time;
         
         // Save updated config
-        if let Err(e) = rs_claude_bar::config_manager::save_config(&updated_config) {
+        if let Err(e) = config_manager::save_config(&updated_config) {
             eprintln!("Warning: Could not save updated config: {}", e);
         }
     }
@@ -230,9 +241,9 @@ pub fn run(config: &rs_claude_bar::ConfigInfo, debug: bool, gaps: bool, limits: 
 fn print_limits_debug(all_entries: &[ClaudeBarUsageEntry]) {
     println!(
         "{bold}{purple}🔍 DEBUG: Limit Messages{reset}",
-        bold = if should_use_colors() { BOLD } else { "" },
-        purple = if should_use_colors() { PURPLE } else { "" },
-        reset = if should_use_colors() { RESET } else { "" },
+        bold = { BOLD },
+        purple = { PURPLE },
+        reset = { RESET },
     );
     println!();
 
@@ -260,8 +271,8 @@ fn print_limits_debug(all_entries: &[ClaudeBarUsageEntry]) {
     println!(
         "{green}✅ Found {} limit messages{reset}",
         limit_entries.len(),
-        green = if should_use_colors() { GREEN } else { "" },
-        reset = if should_use_colors() { RESET } else { "" },
+        green = { GREEN },
+        reset = { RESET },
     );
 }
 
@@ -316,8 +327,6 @@ fn load_all_entries(base_path: &str) -> Vec<ClaudeBarUsageEntry> {
 }
 
 fn analyze_usage_blocks(entries: &[ClaudeBarUsageEntry]) -> Vec<UsageBlock> {
-    use rs_claude_bar::claudebar_types::UserRole;
-
     // Consider only assistant messages
     let mut assistant_entries: Vec<ClaudeBarUsageEntry> = entries
         .iter()
@@ -522,13 +531,11 @@ fn group_entries_into_sessions(entries: &[ClaudeBarUsageEntry]) -> Vec<Vec<Claud
 }
 
 /// Print debug information for FIXED blocks (assured time gaps with limits)
-fn print_blocks_debug(blocks: &[UsageBlock], all_entries: &[ClaudeBarUsageEntry]) {
-    use rs_claude_bar::claudebar_types::UserRole;
-    
+fn print_blocks_debug(blocks: &[UsageBlock], all_entries: &[ClaudeBarUsageEntry]) {    
     println!("{bold}{cyan}🔍 DEBUG: FIXED 5-Hour Windows Analysis{reset}",
-        bold = if should_use_colors() { BOLD } else { "" },
-        cyan = if should_use_colors() { CYAN } else { "" },
-        reset = if should_use_colors() { RESET } else { "" },
+        bold = { BOLD },
+        cyan = { CYAN },
+        reset = { RESET },
     );
     println!();
 
@@ -544,16 +551,16 @@ fn print_blocks_debug(blocks: &[UsageBlock], all_entries: &[ClaudeBarUsageEntry]
 
     // Print table header
     println!("{bold}┌────────────────┬────────────────┬─────────┬────────────────┬────────────────┬───────┬───────────┐{reset}",
-        bold = if should_use_colors() { BOLD } else { "" },
-        reset = if should_use_colors() { RESET } else { "" },
+        bold = { BOLD },
+        reset = { RESET },
     );
     println!("{bold}│   Window Start │     Window End │   Reset │ First Activity │  Last Activity │ Count │    Tokens │{reset}",
-        bold = if should_use_colors() { BOLD } else { "" },
-        reset = if should_use_colors() { RESET } else { "" },
+        bold = { BOLD },
+        reset = { RESET },
     );
     println!("{bold}├────────────────┼────────────────┼─────────┼────────────────┼────────────────┼───────┼───────────┤{reset}",
-        bold = if should_use_colors() { BOLD } else { "" },
-        reset = if should_use_colors() { RESET } else { "" },
+        bold = { BOLD },
+        reset = { RESET },
     );
 
     for block in &fixed_blocks {
@@ -596,23 +603,23 @@ fn print_blocks_debug(blocks: &[UsageBlock], all_entries: &[ClaudeBarUsageEntry]
     }
 
     println!("{bold}└────────────────┴────────────────┴─────────┴────────────────┴────────────────┴───────┴───────────┘{reset}",
-        bold = if should_use_colors() { BOLD } else { "" },
-        reset = if should_use_colors() { RESET } else { "" },
+        bold = { BOLD },
+        reset = { RESET },
     );
     println!();
     println!("{green}✅ Found {} FIXED windows with confirmed limits{reset}",
         fixed_blocks.len(),
-        green = if should_use_colors() { GREEN } else { "" },
-        reset = if should_use_colors() { RESET } else { "" },
+        green = { GREEN },
+        reset = { RESET },
     );
 }
 
 /// Print debug information for gap analysis (sessions)
 fn print_gaps_debug(blocks: &[UsageBlock]) {
     println!("{bold}{yellow}🕳️  DEBUG: Gap Analysis (Sessions){reset}",
-        bold = if should_use_colors() { BOLD } else { "" },
-        yellow = if should_use_colors() { YELLOW } else { "" },
-        reset = if should_use_colors() { RESET } else { "" },
+        bold = { BOLD },
+        yellow = { YELLOW },
+        reset = { RESET },
     );
     println!();
 
@@ -628,16 +635,16 @@ fn print_gaps_debug(blocks: &[UsageBlock]) {
 
     // Print table header
     println!("{bold}┌─────────────────────┬─────────────────────┬──────────┬─────────┬────────────┐{reset}",
-        bold = if should_use_colors() { BOLD } else { "" },
-        reset = if should_use_colors() { RESET } else { "" },
+        bold = { BOLD },
+        reset = { RESET },
     );
     println!("{bold}│ Session Start       │ Session End         │ Duration │ Entries │ Status     │{reset}",
-        bold = if should_use_colors() { BOLD } else { "" },
-        reset = if should_use_colors() { RESET } else { "" },
+        bold = { BOLD },
+        reset = { RESET },
     );
     println!("{bold}├─────────────────────┼─────────────────────┼──────────┼─────────┼────────────┤{reset}",
-        bold = if should_use_colors() { BOLD } else { "" },
-        reset = if should_use_colors() { RESET } else { "" },
+        bold = { BOLD },
+        reset = { RESET },
     );
 
     for block in &session_blocks {
@@ -666,24 +673,24 @@ fn print_gaps_debug(blocks: &[UsageBlock]) {
             end_str,
             duration,
             block.entries.len(),
-            if should_use_colors() { &status_colored } else { status_plain }
+            { &status_colored }
         );
     }
 
     println!("{bold}└─────────────────────┴─────────────────────┴──────────┴─────────┴────────────┘{reset}",
-        bold = if should_use_colors() { BOLD } else { "" },
-        reset = if should_use_colors() { RESET } else { "" },
+        bold = { BOLD },
+        reset = { RESET },
     );
     println!();
     println!("{yellow}🔍 Found {} usage sessions (gaps >1 hour detected){reset}",
         session_blocks.len(),
-        yellow = if should_use_colors() { YELLOW } else { "" },
-        reset = if should_use_colors() { RESET } else { "" },
+        yellow = { YELLOW },
+        reset = { RESET },
     );
 }
 
 /// Parse reset time from limit message content
-// parse_reset_time and calculate_unlock_time now reused from rs_claude_bar::analyze
+// parse_reset_time and calculate_unlock_time now reused from analyze
 
 fn format_duration_hours(duration: Duration) -> String {
     let total_hours = duration.num_hours();
@@ -716,7 +723,7 @@ fn format_number_with_separators(num: u32) -> String {
 mod tests {
     use super::*;
     use chrono::TimeZone;
-    use rs_claude_bar::claudebar_types::{FileInfo, TokenUsage, UserRole};
+    use claudebar_types::{FileInfo, TokenUsage, UserRole};
 
     fn make_entry(ts: &str, limit: bool) -> ClaudeBarUsageEntry {
         ClaudeBarUsageEntry {
