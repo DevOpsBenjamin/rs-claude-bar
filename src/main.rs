@@ -1,13 +1,15 @@
 use clap::Parser;
-use cli::{Cli, Commands};
 
-use crate::config_manager::config_loader::*;
+use rs_claude_bar::config_manager::initialize_config;
+use rs_claude_bar::cache::CacheManager;
+use rs_claude_bar::cli::{Cli, Commands};
+use rs_claude_bar::commands;
 
 fn main() {
     // Initialize configuration (creates folder and file if needed)
     let config = initialize_config();
     // Load cache
-    let mut cache_manager = CacheManager::new(&config.base_path);
+    let mut cache_manager = CacheManager::new(&config.claude_data_path);
 
     // Parse CLI first to see if we have a specific command
     let cli = Cli::parse();

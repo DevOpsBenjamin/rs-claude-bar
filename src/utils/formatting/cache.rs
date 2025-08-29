@@ -1,4 +1,4 @@
-use crate::claudebar_types::cache::CacheStatus;
+use crate::cache::CacheStatus;
 
 pub fn format_cache_status(status: CacheStatus) -> String {
     match status {

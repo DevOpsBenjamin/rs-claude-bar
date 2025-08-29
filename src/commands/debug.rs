@@ -1,8 +1,7 @@
 use chrono::{DateTime, Utc};
 use crate::{
     analyzer::{
-        Analyzer,
-        helpers_v2::scan_claude_folders
+        Analyzer
     },
     claude_types::transcript_entry::Entry,
     commands::shared_types::UsageBlock,
@@ -11,19 +10,9 @@ use crate::{
         config::ConfigInfo,
         usage_entry::ClaudeBarUsageEntry,
         file_info::FolderInfo,
-        cache::{
-            Cache,
-            CacheStatus,
-        },
         display::HeaderInfo,
     },
     display::table::TableCreator,
-    helpers::{
-        cache::{
-            load_cache, 
-            get_file_cache_status
-        },
-    },
     utils::formatting::{
         format_file_size,
         format_duration,
@@ -68,13 +57,14 @@ pub fn run(config: &ConfigInfo, parse: bool, cache: bool, file: Option<String>, 
         if parse {
             run_parse_debug(&base_path); // V1: Old reliable full parse
         } else if cache {
-            run_parse_debug_v2(config, &base_path, no_cache); // V2: New cached system (--no-cache forces full reparse)
+            //run_parse_debug_v2(config, &base_path, no_cache); // V2: New cached system (--no-cache forces full reparse)
         } else {
             run_parse_debug(&base_path); // Default: V1 reliable full parse
         }
     }
 }
 
+/* V2: New cached system
 fn run_parse_debug_v2(config: &ConfigInfo, base_path: &str, no_cache: bool) {
     let cache_status = if no_cache { "No Cache" } else { "Cached" };
     println!(
@@ -95,7 +85,7 @@ fn run_parse_debug_v2(config: &ConfigInfo, base_path: &str, no_cache: bool) {
         let all_files = analyzer.scan_files(base_path);
         (all_files, Vec::new())
     } else {
-        analyzer.analyze_files(base_path)
+        //analyzer.analyze_files(base_path)
     };
     
     println!("📊 File Analysis Results:");
@@ -128,6 +118,7 @@ fn run_parse_debug_v2(config: &ConfigInfo, base_path: &str, no_cache: bool) {
     // TODO: Generate analysis table from cached per-hour data
     println!("📈 Analysis complete! (Per-hour cache implementation pending)");
 }
+ */
 
 fn run_parse_debug(base_path: &str) {
     println!(
@@ -875,6 +866,8 @@ fn print_gaps_debug(blocks: &[UsageBlock]) {
 }
 
 fn run_files_debug(base_path: &str) {
+    /*
+    
     let folders = scan_claude_folders(base_path);
     if folders.is_empty() {
         println!("❌ No folders found in {}", base_path);
@@ -882,17 +875,19 @@ fn run_files_debug(base_path: &str) {
     }
 
     // Load cache (READ-ONLY for debug --files)
-    let cache = load_cache();
+    //let cache = load_cache();
     
     println!("📊 Found {} project folders:", folders.len());
 
     for folder in &folders {
-        print_folder_info(folder, &cache);
+    //    print_folder_info(folder, &cache);
     }
 
     print_files_summary(&folders);
+     */
 }
 
+/*
 fn print_folder_info(folder: &FolderInfo, cache: &Cache) {
     println!(
         "{bold}📁 {}{reset}",
@@ -942,7 +937,9 @@ fn print_folder_info(folder: &FolderInfo, cache: &Cache) {
         reset = { RESET },
     );
 }
+ */
 
+/*
 fn print_files_summary(folders: &[FolderInfo]) {
     let total_folders = folders.len();
     let total_files: usize = folders.iter().map(|f| f.total_files).sum();
@@ -960,4 +957,4 @@ fn print_files_summary(folders: &[FolderInfo]) {
     println!("   Total files: {}", total_files);
     println!("   Total disk usage: {}", format_file_size(total_size));
 }
-
+ */

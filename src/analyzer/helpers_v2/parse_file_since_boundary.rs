@@ -8,6 +8,7 @@ use crate::{
     },
 };
 
+/*
 use super::parse_line::parse_line;
 
 /// Parse file entries since boundary timestamp (reverse optimization)
@@ -75,4 +76,4 @@ mod tests {
         let result = parse_file_since_boundary(&file, None);
         assert!(result.is_empty());
     }
-}
+} */

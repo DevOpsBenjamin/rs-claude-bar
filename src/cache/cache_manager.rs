@@ -6,8 +6,7 @@ pub struct CacheManager {
 
 impl CacheManager {
     pub fn new(base_path: &str) -> Self {
-        let mut cache = load_cache()
-            .unwrap_or_default();
+        let mut cache = load_cache();
         set_file_info(&mut cache, base_path);
         Self { cache }
     }

@@ -6,6 +6,7 @@ use crate::{
     },
 };
 
+/* 
 /// Parse single JSONL line into ClaudeBarUsageEntry
 pub fn parse_line(line: &str, file: &FileSystemInfo) -> Option<ClaudeBarUsageEntry> {
     let line = line.trim();
@@ -54,4 +55,4 @@ mod tests {
         let file = create_test_file_info();
         assert!(parse_line("invalid json", &file).is_none());
     }
-}
+}*/
