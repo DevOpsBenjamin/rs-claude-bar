@@ -31,9 +31,12 @@ pub enum Commands {
 
     /// Debug parse JSONL files in specified directory
     Debug {
-        /// Show detailed parsing statistics with ANSI table for all files
+        /// Show detailed parsing statistics with ANSI table for all files (V1 - reliable)
         #[arg(long)]
         parse: bool,
+        /// Use new cached analysis system (V2 - development)
+        #[arg(long)]
+        cache: bool,
         /// Target specific file for detailed error analysis
         #[arg(long, value_name = "FILEPATH")]
         file: Option<String>,
@@ -49,7 +52,7 @@ pub enum Commands {
         /// Show file system information for all Claude data folders and files
         #[arg(long)]
         files: bool,
-        /// Force full reparse without using cache (for development)
+        /// Force full reparse without using cache (only works with --cache)
         #[arg(long)]
         no_cache: bool,
     },

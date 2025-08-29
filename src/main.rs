@@ -32,6 +32,6 @@ fn main() {
         Commands::Blocks => commands::blocks::run(&config),
 
         //Helper for debuging some part of code no use for real app
-        Commands::Debug { parse, file, blocks, gaps, limits, files, no_cache } => commands::debug::run(&config, parse, file, blocks, gaps, limits, files, no_cache),
+        Commands::Debug { parse, cache, file, blocks, gaps, limits, files, no_cache } => commands::debug::run(&config, parse, cache, file, blocks, gaps, limits, files, no_cache),
     }
 }

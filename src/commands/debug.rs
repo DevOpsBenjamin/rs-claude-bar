@@ -44,7 +44,7 @@ struct FileParseStats {
     total_output_tokens: u32,
 }
 
-pub fn run(config: &ConfigInfo, parse: bool, file: Option<String>, blocks: bool, gaps: bool, limits: bool, files: bool, no_cache: bool) {
+pub fn run(config: &ConfigInfo, parse: bool, cache: bool, file: Option<String>, blocks: bool, gaps: bool, limits: bool, files: bool, no_cache: bool) {
     let base_path = format!("{}/projects", config.claude_data_path);
     let path = Path::new(&base_path);
 
@@ -62,11 +62,13 @@ pub fn run(config: &ConfigInfo, parse: bool, file: Option<String>, blocks: bool,
     } else if files {
         run_files_debug(&base_path);
     } else {
-        // Default behavior - show table view (v2 with cache, old for reference)
-        if parse || no_cache {
-            run_parse_debug(&base_path); // Old version for reference / no-cache
+        // Default behavior - show table view
+        if parse {
+            run_parse_debug(&base_path); // V1: Old reliable full parse
+        } else if cache {
+            run_parse_debug_v2(config, &base_path, no_cache); // V2: New cached system (--no-cache forces full reparse)
         } else {
-            run_parse_debug_v2(config, &base_path, no_cache); // New cached version
+            run_parse_debug(&base_path); // Default: V1 reliable full parse
         }
     }
 }
