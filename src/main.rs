@@ -6,6 +6,8 @@ use crate::config_manager::config_loader::*;
 fn main() {
     // Initialize configuration (creates folder and file if needed)
     let config = initialize_config();
+    // Load cache
+    let mut cache_manager = CacheManager::new(&config.base_path);
 
     // Parse CLI first to see if we have a specific command
     let cli = Cli::parse();

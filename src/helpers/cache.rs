@@ -6,41 +6,6 @@ use crate::claudebar_types::{
     file_info::{FileSystemInfo}
 };
 
-/// Get the path to cache.json in ~/.claude-bar/ directory
-pub fn get_cache_path() -> PathBuf {
-    let mut path = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
-    path.push(".claude-bar");
-    path.push("cache.json");
-    path
-}
-
-/// Load cache from ~/.claude-bar/cache.json
-pub fn load_cache() -> Cache {
-    let cache_path = get_cache_path();
-    
-    if let Ok(content) = fs::read_to_string(&cache_path) {
-        if let Ok(cache) = serde_json::from_str::<Cache>(&content) {
-            return cache;
-        }
-    }
-    
-    // Return empty cache if file doesn't exist or is invalid
-    Cache::default()
-}
-
-/// Save cache to ~/.claude-bar/cache.json
-pub fn save_cache(cache: &Cache) -> Result<(), Box<dyn std::error::Error>> {
-    let cache_path = get_cache_path();    
-    // Create directory if it doesn't exist
-    if let Some(parent) = cache_path.parent() {
-        fs::create_dir_all(parent)?;
-    }    
-    let content = serde_json::to_string_pretty(cache)?;
-    fs::write(cache_path, content)?;
-    
-    Ok(())
-}
-
 /// Determine cache status for a file by comparing file modification time with cached date
 pub fn get_file_cache_status(file_info: &FileSystemInfo, cache: &Cache) -> CacheStatus {
     cache

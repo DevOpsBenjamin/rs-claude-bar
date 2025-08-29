@@ -2,7 +2,7 @@ use chrono::{DateTime, Utc};
 
 use crate::{
     claudebar_types::{
-        cache::{Cache, CacheStatus},
+        cache::{Cache, CacheStatus, CachedFolder, CachedFile},
         config::ConfigInfo,
         file_info::FileSystemInfo,
         per_hour_log::PerHourLog,
@@ -23,7 +23,6 @@ pub struct Analyzer {
     cache: Cache,
     config: ConfigInfo,
 }
-
 impl Analyzer {
     /// Create new analyzer with loaded cache and config
     pub fn new(config: ConfigInfo) -> Self {
@@ -31,21 +30,22 @@ impl Analyzer {
         Self { cache, config }
     }
 
-    pub fn get_file_status(&self, ) -> Vec<CacheFileInfo> {
+    pub fn get_file_status(&self, ) -> Vec<CachedFolder>{
         let mut files = scan_claude_folders(&self.config.claude_data_path)
             .into_iter()
-            .flat_map(|f| f.files)
-            .collect();
-        let mut file_statuses = files.iter()
-            .map(|file| {
-                let status = get_file_cache_status(file, &self.cache);
-                CacheFileInfo {
-                    folder_name: file.folder_name.clone(),
-                    file_name: file.file_name.clone(),
-                    status,
+            .map(|f| {
+                CachedFolder {
+                    folder_name: f.folder_name,
+                    files: f.files.into_iter().map(|file| {
+                        let status = get_file_cache_status(&file, &self.cache);
+                        CachedFile {
+                            file_name: file.file_name,
+                            status,
+                        }
+                    }).collect(),
                 }
             })
-            .collect::<Vec<_>>();
+            .collect();
     }
 
 
