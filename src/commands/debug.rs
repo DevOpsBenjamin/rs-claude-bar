@@ -60,6 +60,7 @@ fn run_parse_debug(base_path: &str) {
         reset = { RESET },
     );
     println!();
+    let analysis_start = std::time::Instant::now();
 
     let path = Path::new(base_path);
     let mut all_file_stats = Vec::new();
@@ -90,6 +91,11 @@ fn run_parse_debug(base_path: &str) {
         println!("❌ No JSONL files found in {}", base_path);
         return;
     }
+    let analysis_duration = analysis_start.elapsed();
+    println!("🔍 Parsed {} files, (analysis took {:.1}ms):", 
+            all_file_stats.len(), 
+            analysis_duration.as_secs_f64() * 1000.0);
+    println!();
 
     // Print ANSI table header
     print_table_header();

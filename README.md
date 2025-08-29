@@ -75,15 +75,16 @@ rs-claude-bar install
 # Clone the repository
 git clone https://github.com/your-username/rs-claude-bar
 cd rs-claude-bar
+# Install nextest for better test output:
+cargo install cargo-nextest
 
 # Build
 cargo build --release
-
 # Install locally
-cargo install --path .
+cargo install --path
 
 # Run tests
-cargo test
+cargo nextest run
 ```
 
 ## How It Works
