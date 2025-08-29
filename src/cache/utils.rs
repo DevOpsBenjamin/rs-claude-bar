@@ -1,4 +1,4 @@
-use std::{fs, path::{Path, PathBuf}};
+use std::{collections::{HashMap, hash_map::Entry}, fs, path::{Path, PathBuf}};
 use chrono::{DateTime, Utc};
 
 use crate::cache::{CacheInfo, CacheStatus, CachedFile, CachedFolder};
@@ -54,17 +54,14 @@ pub fn set_file_info(cache: &mut CacheInfo, base_path: &str) {
         .filter(|entry| entry.path().is_dir());
     
     for entry in dir_entries {
-        let folder_name = entry.file_name().to_string_lossy().to_string();        
-        if !cache.folders.iter().any(|f| f.folder_name == folder_name) {
-            cache.folders.push(CachedFolder {
-                folder_name: folder_name.clone(),
-                files: Vec::new(),
-            });
-        }
+        let folder_name = entry.file_name().to_string_lossy().to_string();
         
-        let cached_folder = cache.folders.iter_mut()
-            .find(|f| f.folder_name == folder_name)
-            .unwrap(); // Safe car on vient de créer l'entrée
+        // Use HashMap entry API for efficient single lookup
+        let cached_folder = cache.folders.entry(folder_name).or_insert_with(|| {
+            CachedFolder {
+                files: HashMap::new(),
+            }
+        });
         
         scan_folder(cached_folder, &entry.path());
     }
@@ -96,27 +93,31 @@ fn scan_folder(cached_folder: &mut CachedFolder, folder_path: &Path) {
            .unwrap_or_else(Utc::now);
         let size_bytes = metadata.map(|m| m.len()).unwrap_or(0);
 
-        let cache_file = cached_folder.files.iter_mut()
-            .find(|f| f.file_name == file_name);
-
-        if let Some(cache_file) = cache_file {
-            cache_file.cache_status = if modified_time > cache_file.modified_time {
-                CacheStatus::NeedsRefresh
-            } else {
-                CacheStatus::Fresh
-            };
-            cache_file.modified_time = modified_time;
-            cache_file.created_time = created_time;
-            cache_file.size_bytes = size_bytes;
-        } else {
-            cached_folder.files.push(CachedFile {
-                file_name: file_name.clone(),
-                data: Vec::new(),
-                cache_status: CacheStatus::NotInCache,
-                modified_time,
-                created_time,
-                size_bytes,
-            });
+        // Use HashMap entry API to distinguish new vs existing files
+        match cached_folder.files.entry(file_name.clone()) {
+            Entry::Vacant(entry) => {
+                // New file not in cache - mark as NotInCache
+                entry.insert(CachedFile {
+                    file_name: file_name.clone(),
+                    data: Vec::new(),
+                    cache_status: CacheStatus::NotInCache,
+                    modified_time,
+                    created_time,
+                    size_bytes,
+                });
+            },
+            Entry::Occupied(mut entry) => {
+                // Existing file - compare dates to check if needs refresh
+                let cached_file = entry.get_mut();
+                cached_file.cache_status = if modified_time > cached_file.modified_time {
+                    CacheStatus::NeedsRefresh
+                } else {
+                    CacheStatus::Fresh
+                };
+                cached_file.modified_time = modified_time;
+                cached_file.created_time = created_time;
+                cached_file.size_bytes = size_bytes;
+            }
         }
    }
 }

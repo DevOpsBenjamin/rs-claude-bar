@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
@@ -5,17 +6,16 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct CacheInfo {
-    pub folders: Vec<CachedFolder>
+    pub folders: HashMap<String, CachedFolder>
 }
 impl Default for CacheInfo {
-    fn default() -> Self { CacheInfo { folders: Vec::new() } }
+    fn default() -> Self { CacheInfo { folders: HashMap::new() } }
 }
 
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CachedFolder {
-    pub folder_name: String,
-    pub files: Vec<CachedFile>,
+    pub files: HashMap<String, CachedFile>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
