@@ -44,8 +44,11 @@ pub fn save_cache(cache: &CacheInfo) {
 
 /// Update cache with current folder structure from base_path
 /// Creates new entries or updates existing ones
+/// base_path should be the Claude data directory (e.g. ~/.claude)
+/// This function automatically scans the /projects subdirectory
 pub fn set_file_info(cache: &mut CacheInfo, base_path: &str) {
-    let path: &Path = Path::new(base_path);
+    let projects_path = format!("{}/projects", base_path);
+    let path: &Path = Path::new(&projects_path);
 
     let dir_entries = fs::read_dir(path)
         .into_iter()

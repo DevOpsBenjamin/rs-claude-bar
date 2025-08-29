@@ -3,13 +3,13 @@ use crate::{
     analyzer::{
         Analyzer
     },
+    cache::CacheManager,
     claude_types::transcript_entry::Entry,
     commands::shared_types::UsageBlock,
     common::colors::*,
     claudebar_types::{
         config::ConfigInfo,
         usage_entry::ClaudeBarUsageEntry,
-        file_info::FolderInfo,
         display::HeaderInfo,
     },
     display::table::TableCreator,
@@ -17,8 +17,8 @@ use crate::{
         format_file_size,
         format_duration,
         format_date,
-        format_cache_status,
         format_number_with_separators,
+        format_cache_status,
     }
 };
 use std::fs;
@@ -35,7 +35,9 @@ struct FileParseStats {
     total_output_tokens: u32,
 }
 
-pub fn run(config: &ConfigInfo, parse: bool, cache: bool, file: Option<String>, blocks: bool, gaps: bool, limits: bool, files: bool, no_cache: bool) {
+// Removed tabled struct - using cool custom TableCreator instead!
+
+pub fn run(config: &ConfigInfo, cache_manager: &mut CacheManager, parse: bool, cache: bool, file: Option<String>, blocks: bool, gaps: bool, limits: bool, files: bool, _no_cache: bool) {
     let base_path = format!("{}/projects", config.claude_data_path);
     let path = Path::new(&base_path);
 
@@ -51,7 +53,7 @@ pub fn run(config: &ConfigInfo, parse: bool, cache: bool, file: Option<String>, 
     } else if blocks || gaps || limits {
         run_blocks_debug(config, gaps, limits);
     } else if files {
-        run_files_debug(&base_path);
+        run_files_debug(cache_manager, &base_path);
     } else {
         // Default behavior - show table view
         if parse {
@@ -865,96 +867,99 @@ fn print_gaps_debug(blocks: &[UsageBlock]) {
     );
 }
 
-fn run_files_debug(base_path: &str) {
-    /*
+fn run_files_debug(cache_manager: &mut CacheManager, base_path: &str) {
+    println!(
+        "{bold}{cyan}📊 Files Debug (Cache-based){reset}",
+        bold = { BOLD },
+        cyan = { CYAN },
+        reset = { RESET },
+    );
+    println!();
+
+    // Use existing cache from main.rs - no refresh needed in CLI
+    let cache_info = cache_manager.get_cache();
     
-    let folders = scan_claude_folders(base_path);
-    if folders.is_empty() {
-        println!("❌ No folders found in {}", base_path);
+    if cache_info.folders.is_empty() {
+        println!("❌ No folders found in cache for {}", base_path);
         return;
     }
 
-    // Load cache (READ-ONLY for debug --files)
-    //let cache = load_cache();
-    
-    println!("📊 Found {} project folders:", folders.len());
-
-    for folder in &folders {
-    //    print_folder_info(folder, &cache);
-    }
-
-    print_files_summary(&folders);
-     */
-}
-
-/*
-fn print_folder_info(folder: &FolderInfo, cache: &Cache) {
-    println!(
-        "{bold}📁 {}{reset}",
-        folder.folder_name,
-        bold = { BOLD },
-        reset = { RESET },
-    );
-    println!("   Files: {} files ({} bytes total)", 
-        folder.total_files,
-        format_file_size(folder.total_size_bytes)
-    );
-
-    // Show table header for files
-    println!("   {bold}┌──────────────────────────────────────────────────┬───────────┬─────────────────────┬─────────────────────┬──────────────┐{reset}",
-        bold = { BOLD },
-        reset = { RESET },
-    );
-    println!("   {bold}│ File Name                                        │ Size      │ Modified            │ Created             │ Cache Status │{reset}",
-        bold = { BOLD },
-        reset = { RESET },
-    );
-    println!("   {bold}├──────────────────────────────────────────────────┼───────────┼─────────────────────┼─────────────────────┼──────────────┤{reset}",
-        bold = { BOLD },
-        reset = { RESET },
-    );
-
-    for file in folder.files.iter() {
-        let truncated_name = if file.file_name.len() > 48 {
-            format!("...{}", &file.file_name[file.file_name.len() - 45..])
-        } else {
-            file.file_name.clone()
-        };
-
-        // Get cache status
-        let cache_status = get_file_cache_status(file, cache);
-
-        println!("   │ {:<48} │ {:>9} │ {} │ {} │  {} │",
-            truncated_name,
-            format_file_size(file.size_bytes),
-            file.modified_time.format("%Y-%m-%d %H:%M:%S"),
-            file.created_time.format("%Y-%m-%d %H:%M:%S"),
-            format_cache_status(cache_status)
-        );
-    }
-    println!("   {bold}└──────────────────────────────────────────────────┴───────────┴─────────────────────┴─────────────────────┴──────────────┘{reset}",
-        bold = { BOLD },
-        reset = { RESET },
-    );
-}
- */
-
-/*
-fn print_files_summary(folders: &[FolderInfo]) {
-    let total_folders = folders.len();
-    let total_files: usize = folders.iter().map(|f| f.total_files).sum();
-    let total_size: u64 = folders.iter().map(|f| f.total_size_bytes).sum();
-
+    println!("📁 Found {} project folders in cache:", cache_info.folders.len());
     println!();
-    println!(
-        "{bold}{green}📊 File System Summary:{reset}",
-        bold = { BOLD },
-        green = { GREEN },
-        reset = { RESET },
-    );
 
-    println!("   Total project folders: {}", total_folders);
-    println!("   Total files: {}", total_files);
-    println!("   Total disk usage: {}", format_file_size(total_size));
+    // Print each folder as a separate table (the cool way!)
+    let mut total_files = 0;
+    let mut total_fresh = 0;
+    let mut total_refresh = 0;
+    let mut total_not_in_cache = 0;
+    let mut total_size = 0u64;
+
+    for (folder_name, cached_folder) in &cache_info.folders {
+        println!("{bold}📁 {}{reset}", 
+            folder_name, 
+            bold = { BOLD }, 
+            reset = { RESET }
+        );
+
+        let files_count = cached_folder.files.len();
+        let folder_size: u64 = cached_folder.files.values().map(|f| f.size_bytes).sum();
+        
+        println!("   Files: {} files ({} total)", 
+            files_count, 
+            format_file_size(folder_size)
+        );
+        println!();
+
+        // Create stylish table with your custom TableCreator - more compact!
+        let headers = vec![
+            HeaderInfo { label: "File Name", width: 48 }, // -2
+            HeaderInfo { label: "Size", width: 9 },       // -2  
+            HeaderInfo { label: "Modified", width: 19 },  // -2
+            HeaderInfo { label: "Created", width: 19 },   // -2
+            HeaderInfo { label: "Cache", width: 10 }, // format_cache_status uses 10 chars
+        ];
+        let mut tc = TableCreator::new(headers);
+        let mut fresh_count = 0;
+        let mut refresh_count = 0;
+        let mut not_in_cache_count = 0;
+
+        for (file_name, cached_file) in &cached_folder.files {
+            // Use existing formatting utils - no manual formatting!
+            match cached_file.cache_status {
+                crate::cache::CacheStatus::Fresh => fresh_count += 1,
+                crate::cache::CacheStatus::NeedsRefresh => refresh_count += 1,
+                crate::cache::CacheStatus::NotInCache => not_in_cache_count += 1,
+            }
+
+            tc.add_row(vec![
+                format_text(file_name.clone, 48), // TableCreator will auto-truncate with width 48
+                format_file_size(cached_file.size_bytes), // Already formatted  
+                format_date(cached_file.modified_time, 19), // Compact format
+                format_date(cached_file.created_time, 19), // Compact format
+                format_cache_status(&cached_file.cache_status) // No clone needed!
+            ]);
+        }
+
+        // Display the beautiful custom table
+        tc.display(false);
+        println!();
+
+        // Update totals
+        total_files += files_count;
+        total_fresh += fresh_count;
+        total_refresh += refresh_count;
+        total_not_in_cache += not_in_cache_count;
+        total_size += folder_size;
+    }
+
+    // Summary
+    println!("{bold}📈 Cache Summary:{reset}", 
+        bold = { BOLD },
+        reset = { RESET }
+    );
+    println!("   Total Files: {}", format_number_with_separators(total_files as u32));
+    println!("   🟢 Fresh: {}", total_fresh);
+    println!("   🟡 Needs Refresh: {}", total_refresh);
+    println!("   🔴 Not In Cache: {}", total_not_in_cache);
+    println!("   💾 Total Size: {}", format_file_size(total_size));
 }
- */

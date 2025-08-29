@@ -8,7 +8,7 @@ use rs_claude_bar::commands;
 fn main() {
     // Initialize configuration (creates folder and file if needed)
     let config = initialize_config();
-    // Load cache
+    // Load cache (will automatically scan projects subdirectory)
     let mut cache_manager = CacheManager::new(&config.claude_data_path);
 
     // Parse CLI first to see if we have a specific command
@@ -25,6 +25,6 @@ fn main() {
         Commands::Blocks => commands::blocks::run(&config),
 
         //Helper for debuging some part of code no use for real app
-        Commands::Debug { parse, cache, file, blocks, gaps, limits, files, no_cache } => commands::debug::run(&config, parse, cache, file, blocks, gaps, limits, files, no_cache),
+        Commands::Debug { parse, cache, file, blocks, gaps, limits, files, no_cache } => commands::debug::run(&config, &mut cache_manager, parse, cache, file, blocks, gaps, limits, files, no_cache),
     }
 }
