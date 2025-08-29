@@ -1,4 +1,4 @@
-use crate::claudebar_types::ConfigInfo;
+use crate::claudebar_types::config::ConfigInfo;
 
 
 pub fn run(config: &ConfigInfo) {

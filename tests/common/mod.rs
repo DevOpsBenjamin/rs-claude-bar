@@ -2,9 +2,9 @@ use chrono::{DateTime, Utc};
 use std::fs;
 use std::path::Path;
 
-use crate::{
-    claude_types::TranscriptEntry,
-    claudebar_types::ClaudeBarUsageEntry
+use rs_claude_bar::{
+    claude_types::transcript_entry::TranscriptEntry,
+    claudebar_types::usage_entry::ClaudeBarUsageEntry
 };
 
 /// Load entries from a test data directory

@@ -5,7 +5,7 @@ use crate::{
     display::items::{StatType, DisplayFormat, DisplayItem},
     config_manager::save_config,
     cli::ConfigCommands,
-    claudebar_types::ConfigInfo
+    claudebar_types::config::ConfigInfo
 };
 
 pub fn run(config_cmd: Option<ConfigCommands>, config: &ConfigInfo) {

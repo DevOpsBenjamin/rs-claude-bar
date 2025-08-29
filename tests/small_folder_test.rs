@@ -1,10 +1,10 @@
 mod common;
 
-use crateclaudebar_types::{group_by_project, ProjectStats, RoleStats};
+use rs_claude_bar::claudebar_types::stats::{group_by_project, ProjectStats, RoleStats};
 
 #[test]
 fn test_small_folder_stats() {
-    let entries = common::load_test_entries("tests/small");
+    let entries = common::load_test_entries("test_data/small");
     assert!(!entries.is_empty(), "Should find entries in tests/small");
     
     let project_stats = group_by_project(&entries);

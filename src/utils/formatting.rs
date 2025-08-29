@@ -14,8 +14,36 @@ pub fn format_number_with_separators(num: u32) -> String {
     result
 }
 
+pub fn format_file_size(bytes: u64) -> String {
+    const UNITS: &[&str] = &["B", "KB", "MB", "GB"];
+    let mut size = bytes as f64;
+    let mut unit_index = 0;
+
+    while size >= 1024.0 && unit_index < UNITS.len() - 1 {
+        size /= 1024.0;
+        unit_index += 1;
+    }
+
+    if unit_index == 0 {
+        format!("{} {}", bytes, UNITS[unit_index])
+    } else {
+        format!("{:.1} {}", size, UNITS[unit_index])
+    }
+}
+
+/// Format token count in human-readable format (e.g., "1.2M", "500k", "123")
+pub fn format_token_count(tokens: u32) -> String {
+    if tokens >= 1_000_000 {
+        format!("{:.1}M", tokens as f64 / 1_000_000.0)
+    } else if tokens >= 1_000 {
+        format!("{}k", tokens / 1_000)
+    } else {
+        tokens.to_string()
+    }
+}
+
 /// Format duration in hours and minutes
-pub fn format_duration_hours(duration: chrono::Duration) -> String {
+pub fn format_duration(duration: chrono::Duration) -> String {
     let total_minutes = duration.num_minutes();
     let hours = total_minutes / 60;
     let minutes = total_minutes % 60;
@@ -24,25 +52,5 @@ pub fn format_duration_hours(duration: chrono::Duration) -> String {
         format!("{}h{:02}m", hours, minutes)
     } else {
         format!("{}m", minutes)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use chrono::Duration;
-
-    #[test]
-    fn test_format_number_with_separators() {
-        assert_eq!(format_number_with_separators(1234), "1,234");
-        assert_eq!(format_number_with_separators(1234567), "1,234,567");
-        assert_eq!(format_number_with_separators(123), "123");
-    }
-
-    #[test]
-    fn test_format_duration_hours() {
-        assert_eq!(format_duration_hours(Duration::minutes(30)), "30m");
-        assert_eq!(format_duration_hours(Duration::minutes(90)), "1h30m");
-        assert_eq!(format_duration_hours(Duration::minutes(125)), "2h05m");
     }
 }

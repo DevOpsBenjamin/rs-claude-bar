@@ -1,6 +1,6 @@
 use chrono::{DateTime, Utc, Duration};
 use crate::{
-    claudebar_types::StatsFile,
+    claudebar_types::config::StatsFile,
     analyze::{BlockStatus, detect_block_status},
     display::
     {

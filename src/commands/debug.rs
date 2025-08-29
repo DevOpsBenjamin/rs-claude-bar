@@ -5,9 +5,15 @@ use crate::{
     common::colors::*,
     claudebar_types::{
         config::ConfigInfo,
-        usage_entry::ClaudeBarUsageEntry
+        usage_entry::ClaudeBarUsageEntry,
+        file_info::FolderInfo,
     },
-    utils::formatting::{format_number_with_separators, format_duration_hours}
+    helpers::file_system::scan_claude_folders,
+    utils::formatting::{
+        format_file_size,
+        format_duration,        
+        format_number_with_separators,
+    }
 };
 use std::fs;
 use std::path::Path;
@@ -23,7 +29,7 @@ struct FileParseStats {
     total_output_tokens: u32,
 }
 
-pub fn run(config: &ConfigInfo, parse: bool, file: Option<String>, blocks: bool, gaps: bool, limits: bool) {
+pub fn run(config: &ConfigInfo, parse: bool, file: Option<String>, blocks: bool, gaps: bool, limits: bool, files: bool) {
     let base_path = format!("{}/projects", config.claude_data_path);
     let path = Path::new(&base_path);
 
@@ -38,6 +44,8 @@ pub fn run(config: &ConfigInfo, parse: bool, file: Option<String>, blocks: bool,
         run_parse_debug(&base_path);
     } else if blocks || gaps || limits {
         run_blocks_debug(config, gaps, limits);
+    } else if files {
+        run_files_debug(&base_path);
     } else {
         // Default behavior - show table view
         run_parse_debug(&base_path);
@@ -793,10 +801,10 @@ fn print_gaps_debug(blocks: &[UsageBlock]) {
         
         let duration = if let Some(end) = block.end_time {
             let dur = end - block.start_time;
-            format_duration_hours(dur)
+            format_duration(dur)
         } else {
             let dur = chrono::Utc::now() - block.start_time;
-            format!("{}+", format_duration_hours(dur))
+            format!("{}+", format_duration(dur))
         };
         
         let status_colored = if block.end_time.is_none() {
@@ -828,4 +836,91 @@ fn print_gaps_debug(blocks: &[UsageBlock]) {
     );
 }
 
+fn run_files_debug(base_path: &str) {
+    let folders = scan_claude_folders(base_path);
+    if folders.is_empty() {
+        println!("❌ No folders found in {}", base_path);
+        return;
+    }
+    println!("📊 Found {} project folders:", folders.len());
+
+    for folder in &folders {
+        print_folder_info(folder);
+    }
+
+    print_files_summary(&folders);
+}
+
+fn print_folder_info(folder: &FolderInfo) {
+    println!(
+        "{bold}📁 {}{reset}",
+        folder.folder_name,
+        bold = { BOLD },
+        reset = { RESET },
+    );
+    println!("   Files: {} files ({} bytes total)", 
+        folder.total_files,
+        format_file_size(folder.total_size_bytes)
+    );
+    // Show table header for files
+    println!("   {bold}┌──────────────────────────────────────────────────┬───────────┬─────────────────────┬─────────────────────┐{reset}",
+        bold = { BOLD },
+        reset = { RESET },
+    );
+    println!("   {bold}│ File Name                                        │ Size      │ Modified            │ Created             │{reset}",
+        bold = { BOLD },
+        reset = { RESET },
+    );
+    println!("   {bold}├──────────────────────────────────────────────────┼───────────┼─────────────────────┼─────────────────────┤{reset}",
+        bold = { BOLD },
+        reset = { RESET },
+    );
+
+    // Show up to 10 most recent files
+    for file in folder.files.iter() {
+        let truncated_name = if file.file_name.len() > 48 {
+            format!("...{}", &file.file_name[file.file_name.len() - 45..])
+        } else {
+            file.file_name.clone()
+        };
+
+        let created_str = file.created_time
+            .map(|t| t.format("%Y-%m-%d %H:%M:%S").to_string())
+            .unwrap_or_else(|| "N/A (Linux)".to_string());
+
+        println!("   │ {:<48} │ {:>9} │ {} │ {} │",
+            truncated_name,
+            format_file_size(file.size_bytes),
+            file.modified_time.format("%Y-%m-%d %H:%M:%S"),
+            created_str
+        );
+    }
+    println!("   {bold}└──────────────────────────────────────────────────┴───────────┴─────────────────────┴─────────────────────┘{reset}",
+        bold = { BOLD },
+        reset = { RESET },
+    );
+}
+
+fn print_files_summary(folders: &[FolderInfo]) {
+    let total_folders = folders.len();
+    let total_files: usize = folders.iter().map(|f| f.total_files).sum();
+    let total_size: u64 = folders.iter().map(|f| f.total_size_bytes).sum();
+
+    let most_recent_global = folders
+        .iter()
+        .filter_map(|f| f.most_recent_modified)
+        .max();
+
+    println!();
+    println!(
+        "{bold}{green}📊 File System Summary:{reset}",
+        bold = { BOLD },
+        green = { GREEN },
+        reset = { RESET },
+    );
+
+    println!("   Total project folders: {}", total_folders);
+    println!("   Total files: {}", total_files);
+    println!("   Total disk usage: {}", format_file_size(total_size));
+}
 

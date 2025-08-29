@@ -16,7 +16,7 @@ use crate::{
     common::colors::*,
 };
 
-pub fn run(config: &ConfigInfo, debug: bool, gaps: bool, limits: bool) {
+pub fn run(config: &ConfigInfo) {
     let mut updated_config = config.clone();
     let base_path = format!("{}/projects", config.claude_data_path);
     let path = Path::new(&base_path);
@@ -69,42 +69,10 @@ pub fn run(config: &ConfigInfo, debug: bool, gaps: bool, limits: bool) {
     let analysis_start = std::time::Instant::now();
     let mut blocks = analyze_usage_blocks(&all_entries);
     let analysis_duration = analysis_start.elapsed();
-
+    
     // Sort blocks by start time descending (most recent first)
     blocks.sort_by(|a, b| b.start_time.cmp(&a.start_time));
-
-    // Handle debug modes - redirect to debug command
-    if debug {
-        println!(
-            "{bold}{yellow}⚠️  Blocks debug functionality has moved to the debug command{reset}",
-            bold = { BOLD },
-            yellow = { YELLOW },
-            reset = { RESET },
-        );
-        println!();
-        println!("Use instead:");
-        if gaps {
-            println!("  {bold}debug --gaps{reset} - Show gaps analysis", 
-                bold = { BOLD },
-                reset = { RESET },
-            );
-        } else if limits {
-            println!("  {bold}debug --limits{reset} - Show limit messages analysis", 
-                bold = { BOLD },
-                reset = { RESET },
-            );
-        } else {
-            println!("  {bold}debug --blocks{reset} - Show blocks debug information", 
-                bold = { BOLD },
-                reset = { RESET },
-            );
-        }
-        println!("  {bold}debug --parse{reset} - Show JSONL parsing analysis", 
-            bold = { BOLD },
-            reset = { RESET },
-        );
-        return;
-    }
+    
 
     // Get last 10 fixed blocks (limit reached, not guessed)
     let fixed_blocks: Vec<&UsageBlock> = blocks.iter()
@@ -116,8 +84,8 @@ pub fn run(config: &ConfigInfo, debug: bool, gaps: bool, limits: bool) {
         .find(|b| !b.limit_reached && b.end_time.is_none());
 
     println!("🔍 Found {} fixed blocks, showing last 10 + current (analysis took {:.1}ms):", 
-             fixed_blocks.len(), 
-             analysis_duration.as_secs_f64() * 1000.0);
+            fixed_blocks.len(), 
+            analysis_duration.as_secs_f64() * 1000.0);
     println!();
     
     // Print table header for current block + last 10 fixed blocks
@@ -134,51 +102,16 @@ pub fn run(config: &ConfigInfo, debug: bool, gaps: bool, limits: bool) {
         reset = { RESET },
     );
 
-    // Show current session estimate first
-    if let Some(current) = current_block {
-        let total_tokens: u32 = current.entries.iter()
-            .map(|e| e.usage.output_tokens)
-            .sum();
-        let session_duration = chrono::Utc::now() - current.start_time;
-        let duration_str = format_duration_hours(session_duration);
-        
-        // Calculate estimated end time (5 hours from start)
-        let estimated_end = current.start_time + Duration::hours(5);
-        let time_remaining = estimated_end - chrono::Utc::now();
-        let remaining_str = if time_remaining.num_seconds() > 0 {
-            format!("{} left", format_duration_hours(time_remaining))
-        } else {
-            "overtime".to_string()
-        };
-        
-        let est_limit = 25000;
-        let percentage = (total_tokens as f64 / est_limit as f64) * 100.0;
-        let status = if percentage > 70.0 {
-            format!("⚠️ {:>3.0}%", percentage)
-        } else {
-            format!("🟢 {:>3.0}%", percentage)
-        };
-
-        println!("│ {:<4} │ {:<11} │ {:<11} │ {:>8} │ {:>7} │ {:>10} │ {:>6} │",
-            "NOW",
-            current.start_time.format("%m-%d %H:%M"),
-            remaining_str,
-            duration_str,
-            total_tokens,
-            current.assistant_count,
-            { &status }
-        );
-    }
-
     // Display last 10 fixed blocks (oldest to newest - most recent at bottom)
-    let display_blocks: Vec<&UsageBlock> = fixed_blocks.iter().rev().take(10).copied().collect();
+    let mut display_blocks: Vec<&UsageBlock> = fixed_blocks.iter().take(10).copied().collect();
+    display_blocks.reverse(); // Reverse the collected vector to show oldest first
     
     for block in display_blocks.iter() {
         let duration = block
             .end_time
             .unwrap_or_else(Utc::now)
             .signed_duration_since(block.start_time);
-        let duration_str = format_duration_hours(duration);
+        let duration_str = format_duration(duration);
 
         let total_tokens: u32 = block.entries.iter()
             .map(|e| e.usage.output_tokens)
@@ -200,6 +133,41 @@ pub fn run(config: &ConfigInfo, debug: bool, gaps: bool, limits: bool) {
             duration_str,
             total_tokens,
             block.assistant_count,
+            { &status }
+        );
+    }
+    // Show current session estimate first
+    if let Some(current) = current_block {
+        let total_tokens: u32 = current.entries.iter()
+            .map(|e| e.usage.output_tokens)
+            .sum();
+        let session_duration = chrono::Utc::now() - current.start_time;
+        let duration_str = format_duration(session_duration);
+        
+        // Calculate estimated end time (5 hours from start)
+        let estimated_end = current.start_time + Duration::hours(5);
+        let time_remaining = estimated_end - chrono::Utc::now();
+        let remaining_str = if time_remaining.num_seconds() > 0 {
+            format!("{} left", format_duration(time_remaining))
+        } else {
+            "overtime".to_string()
+        };
+        
+        let est_limit = 25000;
+        let percentage = (total_tokens as f64 / est_limit as f64) * 100.0;
+        let status = if percentage > 70.0 {
+            format!("⚠️ {:>3.0}%", percentage)
+        } else {
+            format!("🟢 {:>3.0}%", percentage)
+        };
+
+        println!("│ {:<4} │ {:<11} │ {:<11} │ {:>8} │ {:>7} │ {:>10} │ {:>6} │",
+            "NOW",
+            current.start_time.format("%m-%d %H:%M"),
+            remaining_str,
+            duration_str,
+            total_tokens,
+            current.assistant_count,
             { &status }
         );
     }
@@ -265,6 +233,7 @@ fn print_limits_debug(all_entries: &[ClaudeBarUsageEntry]) {
 
 
 fn analyze_usage_blocks(entries: &[ClaudeBarUsageEntry]) -> Vec<UsageBlock> {
+    
     // Consider only assistant messages
     let mut assistant_entries: Vec<ClaudeBarUsageEntry> = entries
         .iter()
@@ -422,11 +391,11 @@ fn calculate_fixed_window_from_reset(limit_timestamp: DateTime<Utc>, reset_time:
         .and_utc();
     
     let window_end = if limit_timestamp >= same_day_reset {
-        // Limit was hit on or after today's reset time, so today's window ended
-        same_day_reset
-    } else {
-        // Limit was hit before today's reset time, so yesterday's window ended
+        // Limit was hit on or after today's reset time, so yesterday's window ended at today's reset
         same_day_reset - Duration::days(1)
+    } else {
+        // Limit was hit before today's reset time, so today's window is ending at today's reset
+        same_day_reset
     };
     
     // Window START is 5 hours before window end
@@ -596,10 +565,10 @@ fn print_gaps_debug(blocks: &[UsageBlock]) {
 
         let duration = if let Some(end) = block.end_time {
             let dur = end - block.start_time;
-            format_duration_hours(dur)
+            format_duration(dur)
         } else {
             let dur = chrono::Utc::now() - block.start_time;
-            format!("{}+", format_duration_hours(dur))
+            format!("{}+", format_duration(dur))
         };
 
         let (status_colored, _status_plain) = if block.end_time.is_none() {
@@ -632,7 +601,7 @@ fn print_gaps_debug(blocks: &[UsageBlock]) {
 /// Parse reset time from limit message content
 // parse_reset_time and calculate_unlock_time now reused from analyze
 
-fn format_duration_hours(duration: Duration) -> String {
+fn format_duration(duration: Duration) -> String {
     let total_hours = duration.num_hours();
     let minutes = (duration.num_minutes() % 60).abs();
 
@@ -657,83 +626,4 @@ fn format_number_with_separators(num: u32) -> String {
     }
     
     result
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use chrono::TimeZone;
-    use claudebar_types::{FileInfo, TokenUsage, UserRole};
-
-    fn make_entry(ts: &str, limit: bool) -> ClaudeBarUsageEntry {
-        ClaudeBarUsageEntry {
-            session_id: String::new(),
-            timestamp: DateTime::parse_from_rfc3339(ts)
-                .unwrap()
-                .with_timezone(&Utc),
-            role: UserRole::Assistant,
-            usage: TokenUsage::default(),
-            content_length: 0,
-            is_limit_reached: limit,
-            content_text: if limit {
-                Some("resets 10pm".into())
-            } else {
-                None
-            },
-            file_info: FileInfo {
-                folder_name: String::new(),
-                file_name: String::new(),
-                file_date: None,
-            },
-        }
-    }
-
-    #[ignore = "Test needs update for FIXED window algorithm"]
-    #[test]
-    fn analyze_blocks_detects_limits_and_gaps() {
-        let entries = vec![
-            make_entry("2024-01-01T09:00:00Z", false),
-            make_entry("2024-01-01T10:00:00Z", false),
-            make_entry("2024-01-01T14:00:00Z", true),
-            make_entry("2024-01-01T20:00:00Z", false),
-            make_entry("2024-01-01T21:00:00Z", false),
-            make_entry("2024-01-02T06:00:00Z", false),
-        ];
-
-        let blocks = analyze_usage_blocks(&entries);
-        assert_eq!(blocks.len(), 3);
-
-        assert_eq!(
-            blocks[0].start_time,
-            Utc.with_ymd_and_hms(2024, 1, 1, 9, 0, 0).unwrap()
-        );
-        assert_eq!(
-            blocks[0].end_time.unwrap(),
-            Utc.with_ymd_and_hms(2024, 1, 1, 14, 0, 0).unwrap()
-        );
-        assert!(blocks[0].limit_reached);
-        assert!(!blocks[0].guessed);
-        assert_eq!(blocks[0].assistant_count, 2);
-
-        assert_eq!(
-            blocks[1].start_time,
-            Utc.with_ymd_and_hms(2024, 1, 1, 20, 0, 0).unwrap()
-        );
-        assert_eq!(
-            blocks[1].end_time.unwrap(),
-            Utc.with_ymd_and_hms(2024, 1, 2, 1, 0, 0).unwrap()
-        );
-        assert!(!blocks[1].limit_reached);
-        assert!(blocks[1].guessed);
-        assert_eq!(blocks[1].assistant_count, 2);
-
-        assert_eq!(
-            blocks[2].start_time,
-            Utc.with_ymd_and_hms(2024, 1, 2, 6, 0, 0).unwrap()
-        );
-        assert!(blocks[2].end_time.is_none());
-        assert!(!blocks[2].limit_reached);
-        assert!(!blocks[2].guessed);
-        assert_eq!(blocks[2].assistant_count, 1);
-    }
 }

@@ -6,8 +6,19 @@ use std::{fs, path::Path, collections::HashMap};
 use crate::{
     claude_types::transcript_entry::TranscriptEntry,
     claudebar_types::{
-        blocks::{AssistantInfo, CurrentBlock, GuessBlock, UserInfo}, 
-        usage_entry::ClaudeBarUsageEntry
+        blocks::{
+            AssistantInfo, 
+            CurrentBlock, 
+            GuessBlock, 
+            UserInfo}, 
+        usage_entry::{
+            ClaudeBarUsageEntry,
+            UserRole
+        },
+        config::{
+            ConfigInfo,
+            SimpleBlock
+        }
     },
 };
 
@@ -297,7 +308,7 @@ pub fn aggregate_events_into_blocks(blocks: &mut Vec<CurrentBlock>, guess: &Vec<
 }
 
 /// Public: update config with the most recent non-projected block date
-pub fn update_last_limit_date(config: &mut crate::claudebar_types::ConfigInfo, blocks: &[CurrentBlock]) {
+pub fn update_last_limit_date(config: &mut ConfigInfo, blocks: &[CurrentBlock]) {
     // Find the most recent non-projected block end time
     let latest_non_projected = blocks
         .iter()
@@ -310,7 +321,7 @@ pub fn update_last_limit_date(config: &mut crate::claudebar_types::ConfigInfo, b
 }
 
 /// Detect if we're in a current 5-hour block or have moved to a new one
-pub fn detect_block_status(now: DateTime<Utc>, current: &Option<crate::claudebar_types::SimpleBlock>) -> BlockStatus {
+pub fn detect_block_status(now: DateTime<Utc>, current: &Option<SimpleBlock>) -> BlockStatus {
     match current {
         None => BlockStatus::NoCurrentBlock,
         Some(block) => {
@@ -337,7 +348,6 @@ pub enum BlockStatus {
 }
 
 fn update_block(block: &mut CurrentBlock, e: &ClaudeBarUsageEntry) {
-    use crate::claudebar_types::UserRole;
     if e.timestamp < block.min_timestamp { block.min_timestamp = e.timestamp; }
     if e.timestamp > block.max_timestamp { block.max_timestamp = e.timestamp; }
 

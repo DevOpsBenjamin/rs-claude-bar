@@ -1,6 +1,7 @@
-use super::{ClaudeBarUsageEntry, UserRole};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+
+use crate::claudebar_types::usage_entry::{ClaudeBarUsageEntry, UserRole};
 
 /// Statistics grouped by project
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

@@ -6,6 +6,7 @@ mod commands;
 mod common;
 mod config_manager;
 mod display;
+mod helpers;
 mod status;
 mod utils;
 
@@ -20,22 +21,17 @@ fn main() {
     // Parse CLI first to see if we have a specific command
     let cli = Cli::parse();
 
-    // Claude input parsing is now handled in the status command itself
-
     // Execute the command  
     match cli.command.unwrap_or(Commands::Info) {
         Commands::Info => commands::info::run(&config),
-        Commands::Manual => commands::help::run(&config),
-        Commands::Prompt => commands::prompt::run(&config),
-        Commands::Update => commands::update::run(&config),
-        Commands::History => commands::history::run(&config),
-        Commands::Stats => commands::stats::run(&config),
-        Commands::DisplayConfig => commands::display_config::run(&config),
-        Commands::Debug { parse, file, blocks, gaps, limits } => commands::debug::run(&config, parse, file, blocks, gaps, limits),
-        Commands::Table => commands::table::run(&config),
-        Commands::Blocks { debug, gaps, limits } => commands::blocks::run(&config, debug, gaps, limits),
-        Commands::Resets => commands::resets::run(&config),
         Commands::Install => commands::install::run(&config),
+        Commands::Help => commands::help::run(&config),
+        Commands::Prompt => commands::prompt::run(&config),
+        Commands::DisplayConfig => commands::display_config::run(&config),
         Commands::Config { command } => commands::config::run(command, &config),
+        Commands::Blocks => commands::blocks::run(&config),
+
+        //Helper for debuging some part of code no use for real app
+        Commands::Debug { parse, file, blocks, gaps, limits, files } => commands::debug::run(&config, parse, file, blocks, gaps, limits, files),
     }
 }

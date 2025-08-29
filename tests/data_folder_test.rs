@@ -1,10 +1,11 @@
 mod common;
 
-use crateclaudebar_types::{group_by_project, ProjectStats, RoleStats};
+use rs_claude_bar::claudebar_types::stats::{group_by_project, ProjectStats, RoleStats};
 
 #[test]
 fn test_data_folder_stats() {
-    let entries = common::load_test_entries("tests/data");
+    let entries = common::load_test_entries("test_data/big");
+    assert!(!entries.is_empty(), "Should find entries in tests/big");
     
     if entries.is_empty() {
         println!("No entries found in tests/data - skipping test");

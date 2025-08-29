@@ -1,7 +1,7 @@
 use crate::{
     display::manager::DisplayManager,
     config_manager::load_stats,
-    claudebar_types::ConfigInfo,
+    claudebar_types::config::ConfigInfo,
 };
 
 /// Generate the complete status line for Claude Code
