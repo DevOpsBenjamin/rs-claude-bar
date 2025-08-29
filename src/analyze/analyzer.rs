@@ -15,6 +15,7 @@ use crate::{
         parse_file_since_boundary,
         group_entries_by_hour,
         round_to_hour_boundary,
+        extract_limit_info,
     }
 };
 
@@ -82,12 +83,15 @@ impl Analyzer {
             }
             
             // Group entries by hour and create PerHourLog summaries
-            let hour_logs = group_entries_by_hour(new_entries);
+            let hour_logs = group_entries_by_hour(new_entries.clone());
             
-            println!("   📊 Created {} hour logs", hour_logs.len());
+            // Extract limit information from the same entries
+            let limit_infos = extract_limit_info(&new_entries);
             
-            // TODO: Store hour_logs in cache.infos for this file
-            // TODO: Merge with existing cached hour logs
+            println!("   📊 Created {} hour logs, {} limit entries", hour_logs.len(), limit_infos.len());
+            
+            // TODO: Store hour_logs and limit_infos in cache.infos for this file
+            // TODO: Merge with existing cached data
             
             // TODO: Uncomment when feature is ready
             // Update file cache date to current file modification time
