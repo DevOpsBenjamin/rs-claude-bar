@@ -3,20 +3,14 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FileSystemInfo {
-    pub folder_name: String,
     pub file_name: String,
-    pub file_path: String, // full path
-    pub size_bytes: u64,
     pub modified_time: DateTime<Utc>,
-    pub created_time: DateTime<Utc>, // Not available on all systems
-    pub exists: bool,
+    pub created_time: DateTime<Utc>,
+    pub size_bytes: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FolderInfo {
     pub folder_name: String,
-    pub folder_path: String,
     pub files: Vec<FileSystemInfo>,
-    pub total_files: usize,
-    pub total_size_bytes: u64,
 }

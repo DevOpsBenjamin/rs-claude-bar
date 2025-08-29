@@ -30,13 +30,11 @@ pub fn load_cache() -> Cache {
 
 /// Save cache to ~/.claude-bar/cache.json
 pub fn save_cache(cache: &Cache) -> Result<(), Box<dyn std::error::Error>> {
-    let cache_path = get_cache_path();
-    
+    let cache_path = get_cache_path();    
     // Create directory if it doesn't exist
     if let Some(parent) = cache_path.parent() {
         fs::create_dir_all(parent)?;
-    }
-    
+    }    
     let content = serde_json::to_string_pretty(cache)?;
     fs::write(cache_path, content)?;
     
@@ -45,28 +43,24 @@ pub fn save_cache(cache: &Cache) -> Result<(), Box<dyn std::error::Error>> {
 
 /// Determine cache status for a file by comparing file modification time with cached date
 pub fn get_file_cache_status(file_info: &FileSystemInfo, cache: &Cache) -> CacheStatus {
-    // Find the folder in cache
-    let cached_folder = cache.folders.iter()
-        .find(|folder| folder.folder_name == file_info.folder_name);
-    
-    if let Some(folder) = cached_folder {
-        // Find the file in cached folder
-        let cached_file = folder.files.iter()
-            .find(|file| file.file_name == file_info.file_name);
-        
-        if let Some(file) = cached_file {
-            // Compare modification times
+    cache
+        .folders
+        .iter()
+        .find(|folder| folder.folder_name == file_info.folder_name)
+        .and_then(|folder| {
+            folder
+                .files
+                .iter()
+                .find(|file| file.file_name == file_info.file_name)
+        })
+        .map(|file| {
             if file_info.modified_time > file.cache_date {
                 CacheStatus::NeedsRefresh
             } else {
                 CacheStatus::Fresh
             }
-        } else {
-            CacheStatus::NotInCache
-        }
-    } else {
-        CacheStatus::NotInCache
-    }
+        })
+        .unwrap_or(CacheStatus::NotInCache)
 }
 
 /// Update cache with new file information (used by parse operations, not by debug --files)

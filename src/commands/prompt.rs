@@ -2,7 +2,7 @@ use std::path::Path;
 use chrono::{Utc, Duration};
 
 use crate::{
-    analyze::{
+    analyzer::{
         detect_block_status,
         BlockStatus,
         load_entries_since

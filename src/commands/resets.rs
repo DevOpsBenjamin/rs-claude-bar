@@ -16,7 +16,7 @@ use crate::{
             GuessBlock,
         },
     },
-    analyze::{
+    analyzer::{
         parse_reset_time,
         load_entries_since,
         detect_block_status,

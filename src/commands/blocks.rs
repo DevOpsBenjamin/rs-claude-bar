@@ -3,7 +3,7 @@ use std::path::Path;
 use chrono::{DateTime, Duration, Utc};
 
 use crate::{
-    analyze::{
+    analyzer::{
         parse_reset_time, 
         calculate_unlock_time,
         load_entries_with_cache

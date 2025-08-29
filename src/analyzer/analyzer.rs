@@ -9,9 +9,9 @@ use crate::{
     },
     helpers::{
         cache::{load_cache, save_cache, get_file_cache_status},
-        file_system::scan_claude_folders,
     },
     analyzer::helpers_v2::{
+        scan_claude_folders,
         parse_file_since_boundary,
         group_entries_by_hour,
         round_to_hour_boundary,
@@ -31,18 +31,23 @@ impl Analyzer {
         Self { cache, config }
     }
 
-    /// Public method for debug --files command (reusable)
-    pub fn scan_files(&self, base_path: &str) -> Vec<FileSystemInfo> {
-        // Reuse existing file scanning logic
-        let folders = scan_claude_folders(base_path);
-        let mut all_files = Vec::new();
-        
-        for folder in folders {
-            all_files.extend(folder.files);
-        }
-        
-        all_files
+    pub fn get_file_status(&self, ) -> Vec<CacheFileInfo> {
+        let mut files = scan_claude_folders(&self.config.claude_data_path)
+            .into_iter()
+            .flat_map(|f| f.files)
+            .collect();
+        let mut file_statuses = files.iter()
+            .map(|file| {
+                let status = get_file_cache_status(file, &self.cache);
+                CacheFileInfo {
+                    folder_name: file.folder_name.clone(),
+                    file_name: file.file_name.clone(),
+                    status,
+                }
+            })
+            .collect::<Vec<_>>();
     }
+
 
     /// Analyze files and determine which need parsing
     pub fn analyze_files(&mut self, base_path: &str) -> (Vec<FileSystemInfo>, Vec<FileSystemInfo>) {
@@ -51,8 +56,7 @@ impl Analyzer {
         let mut cached_files = Vec::new();
         
         for file in files {
-            let cache_status = get_file_cache_status(&file, &self.cache);
-            
+            let cache_status = get_file_cache_status(&file, &self.cache);            
             match cache_status {
                 CacheStatus::Fresh => {
                     cached_files.push(file);
@@ -61,8 +65,7 @@ impl Analyzer {
                     needs_parsing.push(file);
                 }
             }
-        }
-        
+        }        
         (needs_parsing, cached_files)
     }
 

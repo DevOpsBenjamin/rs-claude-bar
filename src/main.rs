@@ -1,17 +1,6 @@
-mod analyze;
-mod claude_types;
-mod claudebar_types;
-mod cli;
-mod commands;
-mod common;
-mod config_manager;
-mod display;
-mod helpers;
-mod status;
-mod utils;
-
 use clap::Parser;
 use cli::{Cli, Commands};
+
 use crate::config_manager::config_loader::*;
 
 fn main() {

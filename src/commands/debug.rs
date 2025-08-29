@@ -1,6 +1,9 @@
 use chrono::{DateTime, Utc};
 use crate::{
-    analyze::Analyzer,
+    analyzer::{
+        Analyzer,
+        helpers_v2::scan_claude_folders
+    },
     claude_types::transcript_entry::Entry,
     commands::shared_types::UsageBlock,
     common::colors::*,
@@ -16,7 +19,6 @@ use crate::{
     },
     display::table::TableCreator,
     helpers::{
-        file_system::scan_claude_folders,
         cache::{
             load_cache, 
             get_file_cache_status
