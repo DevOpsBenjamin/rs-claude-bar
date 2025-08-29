@@ -85,29 +85,29 @@ impl TableCreator {
          // Top border
         print!("{BOLD}┌");
         for (i, h) in self.headers.iter().enumerate() {
-            print!("{:─<width$}", "─", width = h.width);
+            print!("{:─<width$}", "─", width = h.width + 2);
             if i < self.headers.len() - 1 {
                 print!("┬");
             } else {
-                print!("┐{RESET}\n");
+                print!("─┐{RESET}\n");
             }
         }
 
         // Header row
         print!("{BOLD}│");
         for h in &self.headers {
-            print!("{:<width$}│", h.label, width = h.width);
+            print!(" {:<width$} │", h.label, width = h.width);
         }
         print!("{RESET}\n");
 
         // Middle separator
         print!("{BOLD}├");
         for (i, h) in self.headers.iter().enumerate() {
-            print!("{:─<width$}", "─", width = h.width);
+            print!("{:─<width$}", "─", width = h.width + 2);
             if i < self.headers.len() - 1 {
                 print!("┼");
             } else {
-                print!("┤{RESET}\n");
+                print!("─┤{RESET}\n");
             }
         }
     }
@@ -120,7 +120,7 @@ impl TableCreator {
             if i < self.headers.len() - 1 {
                 print!("┴");
             } else {
-                print!("┘{RESET}\n");
+                print!("─┘{RESET}\n");
             }
         }
     }

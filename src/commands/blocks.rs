@@ -175,11 +175,6 @@ pub fn run(config: &ConfigInfo) {
             { &status }
         );
     }
-
-    println!("{bold}└──────┴─────────────┴─────────────┴──────────┴─────────┴────────────┴─────────┘{reset}",
-        bold = { BOLD },
-        reset = { RESET },
-    );
     
     // Update config with the latest block date for next run
     // This needs to be implemented differently as we're not using CurrentBlock here
