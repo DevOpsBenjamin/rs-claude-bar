@@ -11,7 +11,9 @@ use crate::{
             Cache,
             CacheStatus,
         },
+        display::HeaderInfo,
     },
+    display::table::TableCreator,
     helpers::{
         file_system::scan_claude_folders,
         cache::{
@@ -22,6 +24,7 @@ use crate::{
     utils::formatting::{
         format_file_size,
         format_duration,
+        format_date,
         format_cache_status,
         format_number_with_separators,
     }
@@ -108,15 +111,63 @@ fn run_parse_debug(base_path: &str) {
             analysis_duration.as_secs_f64() * 1000.0);
     println!();
 
-    // Print ANSI table header
-    print_table_header();
+    // Create table using TableCreator
+    let headers = vec![
+        HeaderInfo { label: "File Path", width: 80 },
+        HeaderInfo { label: "Total", width: 5 },
+        HeaderInfo { label: "Parsed", width: 7 },
+        HeaderInfo { label: "Empty", width: 6 },
+        HeaderInfo { label: "Errors", width: 7 },
+        HeaderInfo { label: "Min Timestamp", width: 12 },
+        HeaderInfo { label: "Max Timestamp", width: 12 },
+        HeaderInfo { label: "Tokens", width: 8 },
+    ];
+    let mut tc = TableCreator::new(headers);
 
-    // Print each file's stats
     for (file_path, stats) in &all_file_stats {
-        print_file_stats(file_path, stats);
+        let truncated_path = if file_path.len() > 80 {
+            format!("...{}", &file_path[file_path.len() - 77..])
+        } else {
+            file_path.to_string()
+        };
+
+        let min_ts = stats.min_timestamp
+            .map(|ts| ts.format("%m-%d %H:%M").to_string())
+            .unwrap_or_else(|| "N/A".to_string());
+
+        let max_ts = stats.max_timestamp
+            .map(|ts| ts.format("%m-%d %H:%M").to_string())
+            .unwrap_or_else(|| "N/A".to_string());
+
+        let success_rate = if stats.total_lines > stats.empty_lines {
+            let parseable_lines = stats.total_lines - stats.empty_lines;
+            (stats.successful_parses as f64 / parseable_lines as f64) * 100.0
+        } else {
+            0.0
+        };
+
+        // Color coding based on success rate
+        let colored_path = if success_rate >= 95.0 {
+            format!("{green}{:<80}{reset}", truncated_path, green = GREEN, reset = RESET)
+        } else if success_rate >= 80.0 {
+            format!("{yellow}{:<80}{reset}", truncated_path, yellow = YELLOW, reset = RESET)
+        } else {
+            format!("{red}{:<80}{reset}", truncated_path, red = RED, reset = RESET)
+        };
+
+        tc.add_row(vec![
+            colored_path,
+            format!("{:>5}", stats.total_lines),
+            format!("{:>7}", stats.successful_parses),
+            format!("{:>6}", stats.empty_lines),
+            format!("{:>7}", stats.parse_errors),
+            format!("{:>12}", min_ts),
+            format!("{:>12}", max_ts),
+            format!("{:>8}", format_number_with_separators(stats.total_output_tokens)),
+        ]);
     }
 
-    print_table_footer();
+    tc.display(false);
 
     // Print summary
     print_summary(&all_file_stats);
@@ -164,91 +215,6 @@ fn parse_file_content(content: &str) -> FileParseStats {
     stats
 }
 
-fn print_table_header() {
-    let header_sep = "┌──────────────────────────────────────────────────────────────────────────────────┬───────┬─────────┬────────┬─────────┬──────────────┬──────────────┬──────────┐";
-    let header_row = "│ File Path                                                                        │ Total │ Parsed  │ Empty  │ Errors  │ Min Timestamp│ Max Timestamp│ Tokens   │";
-    let header_div = "├──────────────────────────────────────────────────────────────────────────────────┼───────┼─────────┼────────┼─────────┼──────────────┼──────────────┼──────────┤";
-
-    println!(
-        "{bold}{header_sep}{reset}",
-        bold = { BOLD },
-        header_sep = header_sep,
-        reset = { RESET },
-    );
-    
-    println!(
-        "{bold}{header_row}{reset}",
-        bold = { BOLD },
-        header_row = header_row,
-        reset = { RESET },
-    );
-    
-    println!(
-        "{bold}{header_div}{reset}",
-        bold = { BOLD },
-        header_div = header_div,
-        reset = { RESET },
-    );
-}
-
-fn print_file_stats(file_path: &str, stats: &FileParseStats) {
-    let truncated_path = if file_path.len() > 80 {
-        format!("...{}", &file_path[file_path.len() - 77..])
-    } else {
-        file_path.to_string()
-    };
-
-    let min_ts = stats.min_timestamp
-        .map(|ts| ts.format("%m-%d %H:%M").to_string())
-        .unwrap_or_else(|| "N/A".to_string());
-
-    let max_ts = stats.max_timestamp
-        .map(|ts| ts.format("%m-%d %H:%M").to_string())
-        .unwrap_or_else(|| "N/A".to_string());
-
-    let success_rate = if stats.total_lines > stats.empty_lines {
-        let parseable_lines = stats.total_lines - stats.empty_lines;
-        (stats.successful_parses as f64 / parseable_lines as f64) * 100.0
-    } else {
-        0.0
-    };
-
-    // Color coding based on success rate
-    let (color, reset) = {
-        if success_rate >= 95.0 {
-            (GREEN, RESET)
-        } else if success_rate >= 80.0 {
-            (YELLOW, RESET)
-        } else {
-            (RED, RESET)
-        }
-    };
-
-    println!(
-        "│ {color}{:<80}{reset} │ {:>5} │ {:>7} │ {:>6} │ {:>7} │ {:>12} │ {:>12} │ {:>8} │",
-        truncated_path,
-        stats.total_lines,
-        stats.successful_parses,
-        stats.empty_lines,
-        stats.parse_errors,
-        min_ts,
-        max_ts,
-        format_number_with_separators(stats.total_output_tokens),
-        color = color,
-        reset = reset,
-    );
-}
-
-fn print_table_footer() {
-    let footer = "└──────────────────────────────────────────────────────────────────────────────────┴───────┴─────────┴────────┴─────────┴──────────────┴──────────────┴──────────┘";
-    
-    println!(
-        "{bold}{footer}{reset}",
-        bold = { BOLD },
-        footer = footer,
-        reset = { RESET },
-    );
-}
 
 fn print_summary(all_file_stats: &[(String, FileParseStats)]) {
     let total_files = all_file_stats.len();
@@ -796,32 +762,29 @@ fn print_gaps_debug(blocks: &[UsageBlock]) {
         return;
     }
     
-    println!("{bold}┌─────────────────────┬─────────────────────┬──────────┬─────────┬────────────┐{reset}",
-        bold = { BOLD },
-        reset = { RESET },
-    );
-    println!("{bold}│ Session Start       │ Session End         │ Duration │ Entries │ Status     │{reset}",
-        bold = { BOLD },
-        reset = { RESET },
-    );
-    println!("{bold}├─────────────────────┼─────────────────────┼──────────┼─────────┼────────────┤{reset}",
-        bold = { BOLD },
-        reset = { RESET },
-    );
+    // Create table using TableCreator
+    let headers = vec![
+        HeaderInfo { label: "Session Start", width: 19 },
+        HeaderInfo { label: "Session End", width: 19 },
+        HeaderInfo { label: "Duration", width: 10 },
+        HeaderInfo { label: "Entries", width: 7 },
+        HeaderInfo { label: "Status", width: 12 },
+    ];
+    let mut tc = TableCreator::new(headers);
     
     for block in &session_blocks {
         let end_str = if let Some(end) = block.end_time {
-            end.format("%m-%d %H:%M").to_string()
+            format_date(end, 19)
         } else {
             "Ongoing".to_string()
         };
         
         let duration = if let Some(end) = block.end_time {
             let dur = end - block.start_time;
-            format_duration(dur, 11)
+            format_duration(dur, 10)
         } else {
             let dur = chrono::Utc::now() - block.start_time;
-            format!("{}+", format_duration(dur, 11))
+            format!("{}+", format_duration(dur, 9))
         };
         
         let status_colored = if block.end_time.is_none() {
@@ -830,21 +793,16 @@ fn print_gaps_debug(blocks: &[UsageBlock]) {
             format!("{gray}Complete{reset}", gray = GRAY, reset = RESET)
         };
         
-        let start_str = block.start_time.format("%m-%d %H:%M").to_string();
-        
-        println!("│ {:<19} │ {:<19} │ {:<8} │ {:>7} │ {:<10} │",
-            start_str,
+        tc.add_row(vec![
+            format_date(block.start_time, 19),
             end_str,
             duration,
-            block.entries.len(),
-            status_colored
-        );
+            format!("{:>7}", block.entries.len()),
+            status_colored,
+        ]);
     }
     
-    println!("{bold}└─────────────────────┴─────────────────────┴──────────┴─────────┴────────────┘{reset}",
-        bold = { BOLD },
-        reset = { RESET },
-    );
+    tc.display(false);
     
     println!();
     println!("{yellow}📝 Note: These are estimated session boundaries based on gaps > 1 hour{reset}",

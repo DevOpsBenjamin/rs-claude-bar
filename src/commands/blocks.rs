@@ -457,19 +457,17 @@ fn print_blocks_debug(blocks: &[UsageBlock], all_entries: &[ClaudeBarUsageEntry]
         return;
     }
 
-    // Print table header
-    println!("{bold}┌────────────────┬────────────────┬─────────┬────────────────┬────────────────┬───────┬───────────┐{reset}",
-        bold = { BOLD },
-        reset = { RESET },
-    );
-    println!("{bold}│   Window Start │     Window End │   Reset │ First Activity │  Last Activity │ Count │    Tokens │{reset}",
-        bold = { BOLD },
-        reset = { RESET },
-    );
-    println!("{bold}├────────────────┼────────────────┼─────────┼────────────────┼────────────────┼───────┼───────────┤{reset}",
-        bold = { BOLD },
-        reset = { RESET },
-    );
+    // Create table using TableCreator
+    let headers = vec![
+        HeaderInfo { label: "Window Start", width: 14 },
+        HeaderInfo { label: "Window End", width: 14 },
+        HeaderInfo { label: "Reset", width: 7 },
+        HeaderInfo { label: "First Activity", width: 14 },
+        HeaderInfo { label: "Last Activity", width: 14 },
+        HeaderInfo { label: "Count", width: 5 },
+        HeaderInfo { label: "Tokens", width: 9 },
+    ];
+    let mut tc = TableCreator::new(headers);
 
     for block in &fixed_blocks {
         // Find actual activity bounds within the window
@@ -481,13 +479,13 @@ fn print_blocks_debug(blocks: &[UsageBlock], all_entries: &[ClaudeBarUsageEntry]
         let first_activity = activity_entries.iter()
             .map(|e| e.timestamp)
             .min()
-            .map(|t| t.format("%m-%d %H:%M").to_string())
+            .map(|t| format_date(t, 14))
             .unwrap_or_else(|| "No activity".to_string());
 
         let last_activity = activity_entries.iter()
             .map(|e| e.timestamp)
             .max()
-            .map(|t| t.format("%m-%d %H:%M").to_string())
+            .map(|t| format_date(t, 14))
             .unwrap_or_else(|| "No activity".to_string());
 
         let reset_time = block.reset_time.as_deref().unwrap_or("Unknown");
@@ -496,24 +494,18 @@ fn print_blocks_debug(blocks: &[UsageBlock], all_entries: &[ClaudeBarUsageEntry]
             .map(|e| e.usage.output_tokens)
             .sum();
 
-        // Format tokens with thousands separators
-        let tokens_formatted = format_token_count(total_tokens,7);
-
-        println!("│ {:>14} │ {:>14} │ {:>7} │ {:>14} │ {:>14} │ {:>5} │ {:>9} │",
-            block.start_time.format("%m-%d %H:%M"),
-            block.end_time.unwrap().format("%m-%d %H:%M"),
-            reset_time,
+        tc.add_row(vec![
+            format_date(block.start_time, 14),
+            format_date(block.end_time.unwrap(), 14),
+            format!("{:>7}", reset_time),
             first_activity,
             last_activity,
-            count,
-            tokens_formatted
-        );
+            format!("{:>5}", count),
+            format_token_count(total_tokens, 9),
+        ]);
     }
 
-    println!("{bold}└────────────────┴────────────────┴─────────┴────────────────┴────────────────┴───────┴───────────┘{reset}",
-        bold = { BOLD },
-        reset = { RESET },
-    );
+    tc.display(false);
     println!();
     println!("{green}✅ Found {} FIXED windows with confirmed limits{reset}",
         fixed_blocks.len(),
@@ -541,54 +533,47 @@ fn print_gaps_debug(blocks: &[UsageBlock]) {
         return;
     }
 
-    // Print table header
-    println!("{bold}┌─────────────────────┬─────────────────────┬──────────┬─────────┬────────────┐{reset}",
-        bold = { BOLD },
-        reset = { RESET },
-    );
-    println!("{bold}│ Session Start       │ Session End         │ Duration │ Entries │ Status     │{reset}",
-        bold = { BOLD },
-        reset = { RESET },
-    );
-    println!("{bold}├─────────────────────┼─────────────────────┼──────────┼─────────┼────────────┤{reset}",
-        bold = { BOLD },
-        reset = { RESET },
-    );
+    // Create table using TableCreator  
+    let headers = vec![
+        HeaderInfo { label: "Session Start", width: 19 },
+        HeaderInfo { label: "Session End", width: 19 },
+        HeaderInfo { label: "Duration", width: 8 },
+        HeaderInfo { label: "Entries", width: 7 },
+        HeaderInfo { label: "Status", width: 10 },
+    ];
+    let mut tc = TableCreator::new(headers);
 
     for block in &session_blocks {
         let end_str = if let Some(end) = block.end_time {
-            end.format("%m-%d %H:%M").to_string()
+            format_date(end, 19)
         } else {
             "Ongoing".to_string()
         };
 
         let duration = if let Some(end) = block.end_time {
             let dur = end - block.start_time;
-            format_duration(dur,7)
+            format_duration(dur, 8)
         } else {
             let dur = chrono::Utc::now() - block.start_time;
-            format_duration(dur,7)
+            format_duration(dur, 8)
         };
 
-        let (status_colored, _status_plain) = if block.end_time.is_none() {
-            (format!("{green}Active{reset}", green = GREEN, reset = RESET), "Active")
+        let status_colored = if block.end_time.is_none() {
+            format!("{green}Active{reset}", green = GREEN, reset = RESET)
         } else {
-            (format!("{gray}Complete{reset}", gray = GRAY, reset = RESET), "Complete")
+            format!("{gray}Complete{reset}", gray = GRAY, reset = RESET)
         };
 
-        println!("│ {:<19} │ {:<19} │ {:<8} │ {:<7} │ {:<10} │",
-            block.start_time.format("%m-%d %H:%M"),
+        tc.add_row(vec![
+            format_date(block.start_time, 19),
             end_str,
             duration,
-            block.entries.len(),
-            { &status_colored }
-        );
+            format!("{:<7}", block.entries.len()),
+            status_colored,
+        ]);
     }
 
-    println!("{bold}└─────────────────────┴─────────────────────┴──────────┴─────────┴────────────┘{reset}",
-        bold = { BOLD },
-        reset = { RESET },
-    );
+    tc.display(false);
     println!();
     println!("{yellow}🔍 Found {} usage sessions (gaps >1 hour detected){reset}",
         session_blocks.len(),
