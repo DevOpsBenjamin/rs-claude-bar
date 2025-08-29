@@ -1,11 +1,6 @@
 use tabled::{Table, Tabled};
 
-use crate::{
-    common::colors::*,
-    claudebar_types::{
-        config::ConfigInfo
-    }
-};
+use crate::claudebar_types::config::ConfigInfo;
 
 
 #[derive(Tabled)]

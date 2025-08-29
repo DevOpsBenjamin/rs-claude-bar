@@ -1,7 +1,11 @@
 use chrono::{DateTime, Utc};
 use crate::{
     claude_types::transcript_entry::TranscriptEntry,
-    claudebar_types::usage_entry::ClaudeBarUsageEntry,
+    claudebar_types::{
+        usage_entry::ClaudeBarUsageEntry,
+        config::ConfigInfo,
+        stats::group_by_project
+    },
 };
 use std::fs;
 use std::path::Path;

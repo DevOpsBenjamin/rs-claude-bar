@@ -139,7 +139,7 @@ fn configure_display(config: &ConfigInfo) {
         );
         
         for (i, item) in config.display.items.iter().enumerate() {
-            let enabled_indicator = if item.enabled { 
+            let _enabled_indicator = if item.enabled { 
                 format!("{green}✓{reset}", green = GREEN, reset = RESET) 
             } else { 
                 format!("{red}✗{reset}", red = RED, reset = RESET) 

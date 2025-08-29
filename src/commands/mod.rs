@@ -4,6 +4,7 @@ pub mod debug;
 pub mod help;
 pub mod history;
 pub mod info;
+pub mod shared_types;
 pub mod stats;
 pub mod install;
 pub mod prompt;

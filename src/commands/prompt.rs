@@ -7,13 +7,18 @@ use crate::{
         BlockStatus,
         load_entries_since
     },
+    common::input::parse_claude_input,
     config_manager::{
         load_stats, 
         save_stats
     },
-    config_manager::config_loader,
+    status::generate_status_with_config_and_model,
     claudebar_types::{
-        config::{StatsFile},
+        config::{
+            StatsFile,
+            ConfigInfo,
+            SimpleBlock
+        },
         usage_entry::{ 
             ClaudeBarUsageEntry, 
             UserRole
@@ -23,7 +28,7 @@ use crate::{
 
 pub fn run(config: &ConfigInfo) {
     // Check if stats need refreshing (older than 5 seconds)  
-    let stats = crate::load_stats();
+    let stats = load_stats();
     let now = chrono::Utc::now();
     let should_refresh = stats.last_processed
         .map(|last| now.signed_duration_since(last).num_seconds() > 5)

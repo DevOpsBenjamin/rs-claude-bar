@@ -5,7 +5,10 @@ use std::{fs, path::Path, collections::HashMap};
 
 use crate::{
     claude_types::transcript_entry::TranscriptEntry,
-    claudebar_types::{AssistantInfo, CurrentBlock, GuessBlock, UserInfo, ClaudeBarUsageEntry},
+    claudebar_types::{
+        blocks::{AssistantInfo, CurrentBlock, GuessBlock, UserInfo}, 
+        usage_entry::ClaudeBarUsageEntry
+    },
 };
 
 /// Public: load every entry from `~/.claude/projects`-style path

@@ -1,17 +1,15 @@
-// Public modules that can be used as cratemodule_name::*
+// Public modules that can be used as crate::module_name::*
 pub mod analyze;
 pub mod claude_types;
 pub mod claudebar_types;
 pub mod config_manager;
 pub mod display;
 pub mod status;
+pub mod utils;
 
 // Re-export utility modules for internal use
 pub mod colors {
     pub use crate::common::colors::*;
-}
-pub mod utils {
-    pub use crate::common::utils::*;
 }
 pub mod app_dirs {
     pub use crate::common::app_dirs::*;

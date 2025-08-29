@@ -7,6 +7,7 @@ mod common;
 mod config_manager;
 mod display;
 mod status;
+mod utils;
 
 use clap::Parser;
 use cli::{Cli, Commands};

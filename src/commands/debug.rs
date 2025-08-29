@@ -1,11 +1,13 @@
 use chrono::{DateTime, Utc};
 use crate::{
     claude_types::transcript_entry::Entry,
+    commands::shared_types::UsageBlock,
     common::colors::*,
     claudebar_types::{
         config::ConfigInfo,
         usage_entry::ClaudeBarUsageEntry
-    }
+    },
+    utils::formatting::{format_number_with_separators, format_duration_hours}
 };
 use std::fs;
 use std::path::Path;
@@ -543,20 +545,6 @@ fn list_available_files(base_path: &str) {
     }
 }
 
-fn format_number_with_separators(num: u32) -> String {
-    let num_str = num.to_string();
-    let mut result = String::new();
-    let chars: Vec<char> = num_str.chars().collect();
-    
-    for (i, ch) in chars.iter().enumerate() {
-        if i > 0 && (chars.len() - i) % 3 == 0 {
-            result.push(',');
-        }
-        result.push(*ch);
-    }
-    
-    result
-}
 
 fn run_blocks_debug(config: &ConfigInfo, gaps: bool, limits: bool) {
     // Load entries directly and implement debug functionality here
@@ -647,8 +635,10 @@ fn compute_blocks(entries: &[ClaudeBarUsageEntry]) -> Vec<UsageBlock> {
                     start_time: current_block_start,
                     end_time,
                     entries: current_entries.clone(),
+                    assistant_count: current_entries.len(),
                     guessed: false,
                     limit_reached,
+                    reset_time: None,
                     total_tokens,
                     unlock_time: end_time.map(|t| t + chrono::Duration::hours(5)),
                 });
@@ -671,9 +661,11 @@ fn compute_blocks(entries: &[ClaudeBarUsageEntry]) -> Vec<UsageBlock> {
         blocks.push(UsageBlock {
             start_time: current_block_start,
             end_time,
-            entries: current_entries,
+            entries: current_entries.clone(),
+            assistant_count: current_entries.len(),
             guessed: false,
             limit_reached,
+            reset_time: None,
             total_tokens,
             unlock_time: end_time.map(|t| t + chrono::Duration::hours(5)),
         });
@@ -682,16 +674,6 @@ fn compute_blocks(entries: &[ClaudeBarUsageEntry]) -> Vec<UsageBlock> {
     blocks
 }
 
-#[derive(Debug, Clone)]
-struct UsageBlock {
-    pub start_time: DateTime<Utc>,
-    pub end_time: Option<DateTime<Utc>>,
-    pub entries: Vec<ClaudeBarUsageEntry>,
-    pub guessed: bool,
-    pub limit_reached: bool,
-    pub total_tokens: u32,
-    pub unlock_time: Option<DateTime<Utc>>,
-}
 
 fn print_limits_debug(all_entries: &[ClaudeBarUsageEntry]) {
     println!(
@@ -846,15 +828,4 @@ fn print_gaps_debug(blocks: &[UsageBlock]) {
     );
 }
 
-fn format_duration_hours(duration: chrono::Duration) -> String {
-    let total_minutes = duration.num_minutes();
-    let hours = total_minutes / 60;
-    let minutes = total_minutes % 60;
-    
-    if hours > 0 {
-        format!("{}h{:02}m", hours, minutes)
-    } else {
-        format!("{}m", minutes)
-    }
-}
 

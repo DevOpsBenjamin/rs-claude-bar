@@ -1,5 +1,3 @@
-use crate::common::colors::*;
-
 use crate::{
     common::colors::*,
     claudebar_types::{

@@ -1,5 +1,4 @@
 
-use std::fs;
 use std::path::Path;
 use chrono::{DateTime, Duration, Utc};
 
@@ -7,9 +6,9 @@ use crate::{
     analyze::{
         parse_reset_time, 
         calculate_unlock_time,
-        helpers::load_all_entries
+        load_all_entries
     },
-    claude_types::transcript_entry::TranscriptEntry, 
+    commands::shared_types::UsageBlock,
     claudebar_types::{
         usage_entry::{ClaudeBarUsageEntry, UserRole},
         config::ConfigInfo,
@@ -17,17 +16,6 @@ use crate::{
     common::colors::*,
 };
 
-#[derive(Debug, Clone)]
-pub struct UsageBlock {
-    pub start_time: DateTime<Utc>,
-    pub end_time: Option<DateTime<Utc>>,
-    pub entries: Vec<ClaudeBarUsageEntry>,
-    pub assistant_count: usize,
-    pub limit_reached: bool,
-    pub reset_time: Option<String>,         // e.g., "10pm", "11pm"
-    pub unlock_time: Option<DateTime<Utc>>, // calculated unlock timestamp
-    pub guessed: bool,
-}
 pub fn run(config: &ConfigInfo, debug: bool, gaps: bool, limits: bool) {
     let mut updated_config = config.clone();
     let base_path = format!("{}/projects", config.claude_data_path);
@@ -48,7 +36,7 @@ pub fn run(config: &ConfigInfo, debug: bool, gaps: bool, limits: bool) {
 
     // Load ALL entries (blocks analysis needs historical data)
     let start_time = std::time::Instant::now();
-    let mut all_entries = helpers::load_all_entries(&base_path);
+    let mut all_entries = load_all_entries(&base_path);
     
     if all_entries.is_empty() {
         println!("❌ No usage entries found in {}!", base_path);
@@ -231,7 +219,7 @@ pub fn run(config: &ConfigInfo, debug: bool, gaps: bool, limits: bool) {
         updated_config.last_limit_date = latest_real_block.end_time;
         
         // Save updated config
-        if let Err(e) = config_manager::save_config(&updated_config) {
+        if let Err(e) = crate::config_manager::save_config(&updated_config) {
             eprintln!("Warning: Could not save updated config: {}", e);
         }
     }
@@ -276,55 +264,6 @@ fn print_limits_debug(all_entries: &[ClaudeBarUsageEntry]) {
     );
 }
 
-fn load_all_entries(base_path: &str) -> Vec<ClaudeBarUsageEntry> {
-    let mut usage_entries = Vec::new();
-    let path = Path::new(base_path);
-
-    if let Ok(entries) = fs::read_dir(path) {
-        for entry in entries.flatten() {
-            if entry.path().is_dir() {
-                let folder_name = entry.file_name().to_string_lossy().to_string();
-
-                if let Ok(files) = fs::read_dir(entry.path()) {
-                    for file in files.flatten() {
-                        if file.path().extension().and_then(|s| s.to_str()) == Some("jsonl") {
-                            let file_name = file.file_name().to_string_lossy().to_string();
-
-                            // Get file modification date
-                            let file_date = file
-                                .metadata()
-                                .ok()
-                                .and_then(|meta| meta.modified().ok())
-                                .and_then(|time| DateTime::<Utc>::from(time).into());
-
-                            if let Ok(content) = fs::read_to_string(file.path()) {
-                                for line in content.lines() {
-                                    if line.trim().is_empty() {
-                                        continue;
-                                    }
-
-                                    if let Ok(transcript) =
-                                        serde_json::from_str::<TranscriptEntry>(line)
-                                    {
-                                        let usage_entry = ClaudeBarUsageEntry::from_transcript(
-                                            &transcript,
-                                            folder_name.clone(),
-                                            file_name.clone(),
-                                            file_date,
-                                        );
-                                        usage_entries.push(usage_entry);
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    usage_entries
-}
 
 fn analyze_usage_blocks(entries: &[ClaudeBarUsageEntry]) -> Vec<UsageBlock> {
     // Consider only assistant messages
@@ -393,6 +332,7 @@ fn analyze_usage_blocks(entries: &[ClaudeBarUsageEntry]) -> Vec<UsageBlock> {
             reset_time,
             unlock_time,
             guessed: false,
+            total_tokens: 0, // Could calculate actual tokens here
         });
     }
 
@@ -422,12 +362,13 @@ fn analyze_usage_blocks(entries: &[ClaudeBarUsageEntry]) -> Vec<UsageBlock> {
             blocks.push(UsageBlock {
                 start_time: session_start,
                 end_time: if is_ongoing { None } else { Some(session_end) },
-                entries: session,
+                entries: session.clone(),
                 assistant_count,
                 limit_reached: false,
                 reset_time: None,
                 unlock_time: None,
                 guessed: true, // These are estimated sessions
+                total_tokens: session.iter().map(|e| e.usage.output_tokens).sum(),
             });
         }
     }
@@ -662,7 +603,7 @@ fn print_gaps_debug(blocks: &[UsageBlock]) {
             format!("{}+", format_duration_hours(dur))
         };
 
-        let (status_colored, status_plain) = if block.end_time.is_none() {
+        let (status_colored, _status_plain) = if block.end_time.is_none() {
             (format!("{green}Active{reset}", green = GREEN, reset = RESET), "Active")
         } else {
             (format!("{gray}Complete{reset}", gray = GRAY, reset = RESET), "Complete")
