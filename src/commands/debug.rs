@@ -7,11 +7,22 @@ use crate::{
         config::ConfigInfo,
         usage_entry::ClaudeBarUsageEntry,
         file_info::FolderInfo,
+        cache::{
+            Cache,
+            CacheStatus,
+        },
     },
-    helpers::file_system::scan_claude_folders,
+    helpers::{
+        file_system::scan_claude_folders,
+        cache::{
+            load_cache, 
+            get_file_cache_status
+        },
+    },
     utils::formatting::{
         format_file_size,
-        format_duration,        
+        format_duration,
+        format_cache_status,
         format_number_with_separators,
     }
 };
@@ -848,16 +859,20 @@ fn run_files_debug(base_path: &str) {
         println!("❌ No folders found in {}", base_path);
         return;
     }
+
+    // Load cache (READ-ONLY for debug --files)
+    let cache = load_cache();
+    
     println!("📊 Found {} project folders:", folders.len());
 
     for folder in &folders {
-        print_folder_info(folder);
+        print_folder_info(folder, &cache);
     }
 
     print_files_summary(&folders);
 }
 
-fn print_folder_info(folder: &FolderInfo) {
+fn print_folder_info(folder: &FolderInfo, cache: &Cache) {
     println!(
         "{bold}📁 {}{reset}",
         folder.folder_name,
@@ -868,21 +883,21 @@ fn print_folder_info(folder: &FolderInfo) {
         folder.total_files,
         format_file_size(folder.total_size_bytes)
     );
+
     // Show table header for files
-    println!("   {bold}┌──────────────────────────────────────────────────┬───────────┬─────────────────────┬─────────────────────┐{reset}",
+    println!("   {bold}┌──────────────────────────────────────────────────┬───────────┬─────────────────────┬─────────────────────┬──────────────┐{reset}",
         bold = { BOLD },
         reset = { RESET },
     );
-    println!("   {bold}│ File Name                                        │ Size      │ Modified            │ Created             │{reset}",
+    println!("   {bold}│ File Name                                        │ Size      │ Modified            │ Created             │ Cache Status │{reset}",
         bold = { BOLD },
         reset = { RESET },
     );
-    println!("   {bold}├──────────────────────────────────────────────────┼───────────┼─────────────────────┼─────────────────────┤{reset}",
+    println!("   {bold}├──────────────────────────────────────────────────┼───────────┼─────────────────────┼─────────────────────┼──────────────┤{reset}",
         bold = { BOLD },
         reset = { RESET },
     );
 
-    // Show up to 10 most recent files
     for file in folder.files.iter() {
         let truncated_name = if file.file_name.len() > 48 {
             format!("...{}", &file.file_name[file.file_name.len() - 45..])
@@ -890,18 +905,18 @@ fn print_folder_info(folder: &FolderInfo) {
             file.file_name.clone()
         };
 
-        let created_str = file.created_time
-            .map(|t| t.format("%Y-%m-%d %H:%M:%S").to_string())
-            .unwrap_or_else(|| "N/A (Linux)".to_string());
+        // Get cache status
+        let cache_status = get_file_cache_status(file, cache);
 
-        println!("   │ {:<48} │ {:>9} │ {} │ {} │",
+        println!("   │ {:<48} │ {:>9} │ {} │ {} │  {} │",
             truncated_name,
             format_file_size(file.size_bytes),
             file.modified_time.format("%Y-%m-%d %H:%M:%S"),
-            created_str
+            file.created_time.format("%Y-%m-%d %H:%M:%S"),
+            format_cache_status(cache_status)
         );
     }
-    println!("   {bold}└──────────────────────────────────────────────────┴───────────┴─────────────────────┴─────────────────────┘{reset}",
+    println!("   {bold}└──────────────────────────────────────────────────┴───────────┴─────────────────────┴─────────────────────┴──────────────┘{reset}",
         bold = { BOLD },
         reset = { RESET },
     );
@@ -911,11 +926,6 @@ fn print_files_summary(folders: &[FolderInfo]) {
     let total_folders = folders.len();
     let total_files: usize = folders.iter().map(|f| f.total_files).sum();
     let total_size: u64 = folders.iter().map(|f| f.total_size_bytes).sum();
-
-    let most_recent_global = folders
-        .iter()
-        .filter_map(|f| f.most_recent_modified)
-        .max();
 
     println!();
     println!(

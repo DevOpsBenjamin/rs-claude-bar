@@ -8,7 +8,7 @@ pub struct FileSystemInfo {
     pub file_path: String, // full path
     pub size_bytes: u64,
     pub modified_time: DateTime<Utc>,
-    pub created_time: Option<DateTime<Utc>>, // Not available on all systems
+    pub created_time: DateTime<Utc>, // Not available on all systems
     pub exists: bool,
 }
 
@@ -19,5 +19,4 @@ pub struct FolderInfo {
     pub files: Vec<FileSystemInfo>,
     pub total_files: usize,
     pub total_size_bytes: u64,
-    pub most_recent_modified: Option<DateTime<Utc>>,
 }
