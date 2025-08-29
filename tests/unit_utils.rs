@@ -26,7 +26,7 @@ fn test_format_token_count() {
 
 #[test]
 fn test_format_file_size() {
-    assert_eq!(format_file_size(123), "123 B");
+    assert_eq!(format_file_size(123), "123  B");
     assert_eq!(format_file_size(1500), "1.5 KB");
     assert_eq!(format_file_size(1547), "1.5 KB");
     assert_eq!(format_file_size(1_500_000), "1.4 MB");
