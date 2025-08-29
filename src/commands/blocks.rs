@@ -154,12 +154,12 @@ pub fn run(config: &ConfigInfo, debug: bool, gaps: bool, limits: bool) {
         let est_limit = 25000;
         let percentage = (total_tokens as f64 / est_limit as f64) * 100.0;
         let status = if percentage > 70.0 {
-            format!("{yellow}⚠️ {:.0}%{reset}", percentage, yellow = YELLOW, reset = RESET)
+            format!("⚠️ {:>3.0}%", percentage)
         } else {
-            format!("{green}🟢 {:.0}%{reset}", percentage, green = GREEN, reset = RESET)
+            format!("🟢 {:>3.0}%", percentage)
         };
 
-        println!("│ {:<4} │ {:<11} │ {:<11} │ {:<8} │ {:<7} │ {:<10} │ {:<7} │",
+        println!("│ {:<4} │ {:<11} │ {:<11} │ {:>8} │ {:>7} │ {:>10} │ {:>6} │",
             "NOW",
             current.start_time.format("%m-%d %H:%M"),
             remaining_str,
@@ -170,9 +170,8 @@ pub fn run(config: &ConfigInfo, debug: bool, gaps: bool, limits: bool) {
         );
     }
 
-    // Display last 10 fixed blocks (newest first, so reverse the reverse)  
-    let mut display_blocks: Vec<&UsageBlock> = fixed_blocks.iter().rev().take(10).map(|&b| b).collect();
-    display_blocks.reverse();
+    // Display last 10 fixed blocks (oldest to newest - most recent at bottom)
+    let display_blocks: Vec<&UsageBlock> = fixed_blocks.iter().rev().take(10).copied().collect();
     
     for block in display_blocks.iter() {
         let duration = block
@@ -192,9 +191,9 @@ pub fn run(config: &ConfigInfo, debug: bool, gaps: bool, limits: bool) {
 
         let reset_time = block.reset_time.as_deref().unwrap_or("?");
         
-        let status = format!("{red}🔴 {}{reset}", reset_time, red = RED, reset = RESET);
+        let status = format!("🔴 {:>4}", reset_time);
 
-        println!("│ {:<4} │ {:<11} │ {:<11} │ {:<8} │ {:<7} │ {:<10} │ {:<7} │",
+        println!("│ {:<4} │ {:<11} │ {:<11} │ {:>8} │ {:>7} │ {:>10} │ {:>6} │",
             "PAST",
             block.start_time.format("%m-%d %H:%M"),
             end_display,
