@@ -3,7 +3,9 @@ mod number;
 mod token;
 mod file;
 mod duration;
+mod date;
 
+pub use date::*;
 pub use duration::*;
 pub use file::*;
 pub use token::*;

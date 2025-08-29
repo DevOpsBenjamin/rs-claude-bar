@@ -818,10 +818,10 @@ fn print_gaps_debug(blocks: &[UsageBlock]) {
         
         let duration = if let Some(end) = block.end_time {
             let dur = end - block.start_time;
-            format_duration(dur)
+            format_duration(dur, 11)
         } else {
             let dur = chrono::Utc::now() - block.start_time;
-            format!("{}+", format_duration(dur))
+            format!("{}+", format_duration(dur, 11))
         };
         
         let status_colored = if block.end_time.is_none() {

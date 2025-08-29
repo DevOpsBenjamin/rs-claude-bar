@@ -8,10 +8,19 @@ use crate::{
         calculate_unlock_time,
         load_all_entries
     },
+    utils::formatting::{
+        format_date,
+        format_duration,
+        format_token_count
+    },
+    display::table::TableCreator,
     commands::shared_types::UsageBlock,
     claudebar_types::{
         usage_entry::{ClaudeBarUsageEntry, UserRole},
         config::ConfigInfo,
+        display::{
+            HeaderInfo,
+        }
     },
     common::colors::*,
 };
@@ -72,13 +81,12 @@ pub fn run(config: &ConfigInfo) {
     
     // Sort blocks by start time descending (most recent first)
     blocks.sort_by(|a, b| b.start_time.cmp(&a.start_time));
-    
+
 
     // Get last 10 fixed blocks (limit reached, not guessed)
     let fixed_blocks: Vec<&UsageBlock> = blocks.iter()
         .filter(|b| b.limit_reached && !b.guessed)
         .collect();
-    
     // Get current ongoing block (not limit reached, no end time)
     let current_block = blocks.iter()
         .find(|b| !b.limit_reached && b.end_time.is_none());
@@ -88,67 +96,63 @@ pub fn run(config: &ConfigInfo) {
             analysis_duration.as_secs_f64() * 1000.0);
     println!();
     
-    // Print table header for current block + last 10 fixed blocks
-    println!("{bold}┌──────┬─────────────┬─────────────┬──────────┬─────────┬────────────┬─────────┐{reset}",
-        bold = { BOLD },
-        reset = { RESET },
-    );
-    println!("{bold}│ Type │ Start       │ End         │ Duration │ Tokens  │ Messages   │ Status  │{reset}",
-        bold = { BOLD },
-        reset = { RESET },
-    );
-    println!("{bold}├──────┼─────────────┼─────────────┼──────────┼─────────┼────────────┼─────────┤{reset}",
-        bold = { BOLD },
-        reset = { RESET },
-    );
+    //Table using Helper
+    let headers = vec![
+        HeaderInfo { label: "Type", width: 6 },
+        HeaderInfo { label: "Start", width: 13 },
+        HeaderInfo { label: "End", width: 13 },
+        HeaderInfo { label: "Duration", width: 10 },
+        HeaderInfo { label: "Tokens", width: 9 },
+        HeaderInfo { label: "Messages", width: 12 },
+        HeaderInfo { label: "Status", width: 9 },
+    ];
+    let mut tc = TableCreator::new(headers);
 
-    // Display last 10 fixed blocks (oldest to newest - most recent at bottom)
+    // Fixed blocks
     let mut display_blocks: Vec<&UsageBlock> = fixed_blocks.iter().take(10).copied().collect();
-    display_blocks.reverse(); // Reverse the collected vector to show oldest first
+    display_blocks.reverse();
     
     for block in display_blocks.iter() {
-        let duration = block
+        let end_time = block
             .end_time
-            .unwrap_or_else(Utc::now)
-            .signed_duration_since(block.start_time);
-        let duration_str = format_duration(duration);
-
-        let total_tokens: u32 = block.entries.iter()
-            .map(|e| e.usage.output_tokens)
-            .sum();
-
-        let end_display = block
-            .end_time
-            .map(|t| t.format("%m-%d %H:%M").to_string())
-            .unwrap_or_else(|| "ongoing".to_string());
-
-        let reset_time = block.reset_time.as_deref().unwrap_or("?");
+            .unwrap_or_else(Utc::now);
+        let duration = end_time.signed_duration_since(block.start_time);
+        let total_tokens: u32 = block.entries.iter().map(|e| e.usage.output_tokens).sum();
         
-        let status = format!("🔴 {:>4}", reset_time);
+        // reset format
+        let reset_time = block.reset_time.as_deref().unwrap_or("?");
+        let mut type_display = format!("{:>6}", "PAST");
+        let mut status = format!("🔴 {:>4}", reset_time);
+        if end_time> Utc::now() {
+            type_display = format!("{:>6}", "NOW");
+            status = format!("🟢 {:>4}", reset_time);
+        }
 
-        println!("│ {:<4} │ {:<11} │ {:<11} │ {:>8} │ {:>7} │ {:>10} │ {:>6} │",
-            "PAST",
-            block.start_time.format("%m-%d %H:%M"),
-            end_display,
-            duration_str,
-            total_tokens,
-            block.assistant_count,
-            { &status }
-        );
+        tc.add_row(vec![
+            type_display,
+            format_date(block.start_time, 11),
+            format_date(end_time, 11),
+            format_duration(duration, 8),
+            format_token_count(total_tokens, 7),
+            format!("{:>10}", block.assistant_count.to_string()),
+            status
+        ]);
     }
+    tc.display(false);
+
     // Show current session estimate first
     if let Some(current) = current_block {
         let total_tokens: u32 = current.entries.iter()
             .map(|e| e.usage.output_tokens)
             .sum();
         let session_duration = chrono::Utc::now() - current.start_time;
-        let duration_str = format_duration(session_duration);
+        let duration_str = format_duration(session_duration, 8);
         
         // Calculate estimated end time (5 hours from start)
         let estimated_end = current.start_time + Duration::hours(5);
         let time_remaining = estimated_end - chrono::Utc::now();
         let remaining_str = if time_remaining.num_seconds() > 0 {
-            format!("{} left", format_duration(time_remaining))
+            format!("{} left", format_duration(time_remaining, 8))
         } else {
             "overtime".to_string()
         };
@@ -498,7 +502,7 @@ fn print_blocks_debug(blocks: &[UsageBlock], all_entries: &[ClaudeBarUsageEntry]
             .sum();
 
         // Format tokens with thousands separators
-        let tokens_formatted = format_number_with_separators(total_tokens);
+        let tokens_formatted = format_token_count(total_tokens,7);
 
         println!("│ {:>14} │ {:>14} │ {:>7} │ {:>14} │ {:>14} │ {:>5} │ {:>9} │",
             block.start_time.format("%m-%d %H:%M"),
@@ -565,10 +569,10 @@ fn print_gaps_debug(blocks: &[UsageBlock]) {
 
         let duration = if let Some(end) = block.end_time {
             let dur = end - block.start_time;
-            format_duration(dur)
+            format_duration(dur,7)
         } else {
             let dur = chrono::Utc::now() - block.start_time;
-            format!("{}+", format_duration(dur))
+            format_duration(dur,7)
         };
 
         let (status_colored, _status_plain) = if block.end_time.is_none() {
@@ -596,34 +600,4 @@ fn print_gaps_debug(blocks: &[UsageBlock]) {
         yellow = { YELLOW },
         reset = { RESET },
     );
-}
-
-/// Parse reset time from limit message content
-// parse_reset_time and calculate_unlock_time now reused from analyze
-
-fn format_duration(duration: Duration) -> String {
-    let total_hours = duration.num_hours();
-    let minutes = (duration.num_minutes() % 60).abs();
-
-    if total_hours == 0 {
-        format!("{}m", minutes)
-    } else {
-        format!("{}h {}m", total_hours, minutes)
-    }
-}
-
-/// Format a number with thousands separators (e.g., 1,234,567)
-fn format_number_with_separators(num: u32) -> String {
-    let num_str = num.to_string();
-    let mut result = String::new();
-    let chars: Vec<char> = num_str.chars().collect();
-    
-    for (i, ch) in chars.iter().enumerate() {
-        if i > 0 && (chars.len() - i) % 3 == 0 {
-            result.push(',');
-        }
-        result.push(*ch);
-    }
-    
-    result
 }
