@@ -19,6 +19,7 @@ use crate::{
         format_date,
         format_number_with_separators,
         format_cache_status,
+        format_text,
     }
 };
 use std::fs;
@@ -37,7 +38,7 @@ struct FileParseStats {
 
 // Removed tabled struct - using cool custom TableCreator instead!
 
-pub fn run(config: &ConfigInfo, cache_manager: &mut CacheManager, parse: bool, cache: bool, file: Option<String>, blocks: bool, gaps: bool, limits: bool, files: bool, _no_cache: bool) {
+pub fn run(config: &ConfigInfo, cache_manager: &mut CacheManager, parse: bool, cache: bool, file: Option<String>, blocks: bool, gaps: bool, limits: bool, files: bool) {
     let base_path = format!("{}/projects", config.claude_data_path);
     let path = Path::new(&base_path);
 
@@ -47,21 +48,21 @@ pub fn run(config: &ConfigInfo, cache_manager: &mut CacheManager, parse: bool, c
     }
 
     if let Some(filepath) = file {
-        run_single_file_debug(&base_path, &filepath);
+        run_single_file_debug(cache_manager, &base_path, &filepath);
     } else if parse {
-        run_parse_debug(&base_path);
+        run_parse_debug(cache_manager, &base_path);
     } else if blocks || gaps || limits {
-        run_blocks_debug(config, gaps, limits);
+        run_blocks_debug(config, cache_manager, gaps, limits);
     } else if files {
         run_files_debug(cache_manager, &base_path);
     } else {
         // Default behavior - show table view
         if parse {
-            run_parse_debug(&base_path); // V1: Old reliable full parse
+            run_parse_debug(cache_manager, &base_path); // V1: Now cache-based
         } else if cache {
             //run_parse_debug_v2(config, &base_path, no_cache); // V2: New cached system (--no-cache forces full reparse)
         } else {
-            run_parse_debug(&base_path); // Default: V1 reliable full parse
+            run_parse_debug(cache_manager, &base_path); // Default: Now cache-based
         }
     }
 }
@@ -122,9 +123,9 @@ fn run_parse_debug_v2(config: &ConfigInfo, base_path: &str, no_cache: bool) {
 }
  */
 
-fn run_parse_debug(base_path: &str) {
+fn run_parse_debug(cache_manager: &CacheManager, base_path: &str) {
     println!(
-        "{bold}{cyan}🔍 DEBUG: JSONL Parse Analysis{reset}",
+        "{bold}{cyan}🔍 DEBUG: JSONL Parse Analysis (Cache-based){reset}",
         bold = { BOLD },
         cyan = { CYAN },
         reset = { RESET },
@@ -132,33 +133,23 @@ fn run_parse_debug(base_path: &str) {
     println!();
     let analysis_start = std::time::Instant::now();
 
-    let path = Path::new(base_path);
+    let cache_info = cache_manager.get_cache();
     let mut all_file_stats = Vec::new();
 
-    if let Ok(entries) = fs::read_dir(path) {
-        for entry in entries.flatten() {
-            if entry.path().is_dir() {
-                let folder_name = entry.file_name().to_string_lossy().to_string();
-
-                if let Ok(files) = fs::read_dir(entry.path()) {
-                    for file in files.flatten() {
-                        if file.path().extension().and_then(|s| s.to_str()) == Some("jsonl") {
-                            let file_name = file.file_name().to_string_lossy().to_string();
-                            let file_path = format!("{}/{}", folder_name, file_name);
-                            
-                            if let Ok(content) = fs::read_to_string(file.path()) {
-                                let stats = parse_file_content(&content);
-                                all_file_stats.push((file_path, stats));
-                            }
-                        }
-                    }
-                }
+    for (folder_name, cached_folder) in &cache_info.folders {
+        for (file_name, cached_file) in &cached_folder.files {
+            let file_path = format!("{}/{}", folder_name, file_name);
+            let full_path = format!("{}/{}/{}", base_path, folder_name, file_name);
+            
+            if let Ok(content) = fs::read_to_string(full_path) {
+                let stats = parse_file_content(&content);
+                all_file_stats.push((file_path, stats));
             }
         }
     }
 
     if all_file_stats.is_empty() {
-        println!("❌ No JSONL files found in {}", base_path);
+        println!("❌ No JSONL files found in cache for {}", base_path);
         return;
     }
     let analysis_duration = analysis_start.elapsed();
@@ -347,9 +338,9 @@ fn print_summary(all_file_stats: &[(String, FileParseStats)]) {
 }
 
 
-fn run_single_file_debug(base_path: &str, target_file: &str) {
+fn run_single_file_debug(cache_manager: &CacheManager, base_path: &str, target_file: &str) {
     println!(
-        "{bold}{cyan}🔍 DEBUG: Single File Parse Analysis{reset}",
+        "{bold}{cyan}🔍 DEBUG: Single File Parse Analysis (Cache-based){reset}",
         bold = { BOLD },
         cyan = { CYAN },
         reset = { RESET },
@@ -357,41 +348,31 @@ fn run_single_file_debug(base_path: &str, target_file: &str) {
     println!("Target file: {}", target_file);
     println!();
 
-    let path = Path::new(base_path);
+    let cache_info = cache_manager.get_cache();
     let mut file_found = false;
 
-    if let Ok(entries) = fs::read_dir(path) {
-        'outer: for entry in entries.flatten() {
-            if entry.path().is_dir() {
-                let folder_name = entry.file_name().to_string_lossy().to_string();
-
-                if let Ok(files) = fs::read_dir(entry.path()) {
-                    for file in files.flatten() {
-                        if file.path().extension().and_then(|s| s.to_str()) == Some("jsonl") {
-                            let file_name = file.file_name().to_string_lossy().to_string();
-                            let file_path = format!("{}/{}", folder_name, file_name);
-                            
-                            // Check if this is the target file (partial match)
-                            if file_path.contains(target_file) || file_name.contains(target_file) {
-                                file_found = true;
-                                println!(
-                                    "{bold}📄 Analyzing: {}{reset}",
-                                    file_path,
-                                    bold = { BOLD },
-                                    reset = { RESET },
-                                );
-                                println!();
-                                
-                                if let Ok(content) = fs::read_to_string(file.path()) {
-                                    analyze_single_file_with_errors(&content, &file_path);
-                                } else {
-                                    println!("❌ Could not read file: {}", file_path);
-                                }
-                                break 'outer;
-                            }
-                        }
-                    }
+    for (folder_name, cached_folder) in &cache_info.folders {
+        for (file_name, _cached_file) in &cached_folder.files {
+            let file_path = format!("{}/{}", folder_name, file_name);
+            
+            // Check if this is the target file (partial match)
+            if file_path.contains(target_file) || file_name.contains(target_file) {
+                file_found = true;
+                println!(
+                    "{bold}📄 Analyzing: {}{reset}",
+                    file_path,
+                    bold = { BOLD },
+                    reset = { RESET },
+                );
+                println!();
+                
+                let full_path = format!("{}/{}/{}", base_path, folder_name, file_name);
+                if let Ok(content) = fs::read_to_string(full_path) {
+                    analyze_single_file_with_errors(&content, &file_path);
+                } else {
+                    println!("❌ Could not read file: {}", file_path);
                 }
+                return;
             }
         }
     }
@@ -400,7 +381,7 @@ fn run_single_file_debug(base_path: &str, target_file: &str) {
         println!("❌ File not found: {}", target_file);
         println!();
         println!("Available files:");
-        list_available_files(base_path);
+        list_available_files_from_cache(cache_manager);
     }
 }
 
@@ -571,32 +552,21 @@ fn analyze_single_file_with_errors(content: &str, _file_path: &str) {
     }
 }
 
-fn list_available_files(base_path: &str) {
-    let path = Path::new(base_path);
+fn list_available_files_from_cache(cache_manager: &CacheManager) {
+    let cache_info = cache_manager.get_cache();
     
-    if let Ok(entries) = fs::read_dir(path) {
-        for entry in entries.flatten() {
-            if entry.path().is_dir() {
-                let folder_name = entry.file_name().to_string_lossy().to_string();
-
-                if let Ok(files) = fs::read_dir(entry.path()) {
-                    for file in files.flatten() {
-                        if file.path().extension().and_then(|s| s.to_str()) == Some("jsonl") {
-                            let file_name = file.file_name().to_string_lossy().to_string();
-                            println!("   {}/{}", folder_name, file_name);
-                        }
-                    }
-                }
-            }
+    for (folder_name, cached_folder) in &cache_info.folders {
+        for (file_name, _cached_file) in &cached_folder.files {
+            println!("   {}/{}", folder_name, file_name);
         }
     }
 }
 
 
-fn run_blocks_debug(config: &ConfigInfo, gaps: bool, limits: bool) {
-    // Load entries directly and implement debug functionality here
+fn run_blocks_debug(config: &ConfigInfo, cache_manager: &CacheManager, gaps: bool, limits: bool) {
+    // Load entries using cache and implement debug functionality here
     let base_path = format!("{}/projects", config.claude_data_path);
-    let all_entries = load_usage_entries(&base_path);
+    let all_entries = load_usage_entries(cache_manager, &base_path);
 
     if limits {
         print_limits_debug(&all_entries);
@@ -609,45 +579,30 @@ fn run_blocks_debug(config: &ConfigInfo, gaps: bool, limits: bool) {
     }
 }
 
-fn load_usage_entries(base_path: &str) -> Vec<ClaudeBarUsageEntry> {
+fn load_usage_entries(cache_manager: &CacheManager, base_path: &str) -> Vec<ClaudeBarUsageEntry> {
     let mut usage_entries = Vec::new();
-    let path = Path::new(base_path);
+    let cache_info = cache_manager.get_cache();
 
-    if let Ok(entries) = fs::read_dir(path) {
-        for entry in entries.flatten() {
-            if entry.path().is_dir() {
-                let folder_name = entry.file_name().to_string_lossy().to_string();
+    for (folder_name, cached_folder) in &cache_info.folders {
+        for (file_name, cached_file) in &cached_folder.files {
+            let file_date = Some(cached_file.modified_time);
+            let full_path = format!("{}/{}/{}", base_path, folder_name, file_name);
 
-                if let Ok(files) = fs::read_dir(entry.path()) {
-                    for file in files.flatten() {
-                        if file.path().extension().and_then(|s| s.to_str()) == Some("jsonl") {
-                            let file_name = file.file_name().to_string_lossy().to_string();
+            if let Ok(content) = fs::read_to_string(full_path) {
+                for line in content.lines() {
+                    if line.trim().is_empty() {
+                        continue;
+                    }
 
-                            let file_date = file
-                                .metadata()
-                                .ok()
-                                .and_then(|meta| meta.modified().ok())
-                                .map(|time| DateTime::<Utc>::from(time));
-
-                            if let Ok(content) = fs::read_to_string(file.path()) {
-                                for line in content.lines() {
-                                    if line.trim().is_empty() {
-                                        continue;
-                                    }
-
-                                    if let Ok(entry_parsed) = serde_json::from_str::<Entry>(line) {
-                                        if let Entry::Transcript(transcript) = entry_parsed {
-                                            let usage_entry = ClaudeBarUsageEntry::from_transcript(
-                                                &transcript,
-                                                folder_name.clone(),
-                                                file_name.clone(),
-                                                file_date,
-                                            );
-                                            usage_entries.push(usage_entry);
-                                        }
-                                    }
-                                }
-                            }
+                    if let Ok(entry_parsed) = serde_json::from_str::<Entry>(line) {
+                        if let Entry::Transcript(transcript) = entry_parsed {
+                            let usage_entry = ClaudeBarUsageEntry::from_transcript(
+                                &transcript,
+                                folder_name.clone(),
+                                file_name.clone(),
+                                file_date,
+                            );
+                            usage_entries.push(usage_entry);
                         }
                     }
                 }
@@ -867,6 +822,7 @@ fn print_gaps_debug(blocks: &[UsageBlock]) {
     );
 }
 
+
 fn run_files_debug(cache_manager: &mut CacheManager, base_path: &str) {
     println!(
         "{bold}{cyan}📊 Files Debug (Cache-based){reset}",
@@ -932,7 +888,7 @@ fn run_files_debug(cache_manager: &mut CacheManager, base_path: &str) {
             }
 
             tc.add_row(vec![
-                format_text(file_name.clone, 48), // TableCreator will auto-truncate with width 48
+                format_text(file_name, 48), // Right-aligned truncated text
                 format_file_size(cached_file.size_bytes), // Already formatted  
                 format_date(cached_file.modified_time, 19), // Compact format
                 format_date(cached_file.created_time, 19), // Compact format

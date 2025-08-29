@@ -1,4 +1,8 @@
 use clap::Parser;
+use std::time::Instant;
+use std::fs;
+use std::path::PathBuf;
+use chrono::{DateTime, Utc};
 
 use rs_claude_bar::config_manager::initialize_config;
 use rs_claude_bar::cache::CacheManager;
@@ -6,13 +10,20 @@ use rs_claude_bar::cli::{Cli, Commands};
 use rs_claude_bar::commands;
 
 fn main() {
+    let start = std::time::Instant::now();
     // Initialize configuration (creates folder and file if needed)
-    let config = initialize_config();
-    // Load cache (will automatically scan projects subdirectory)
-    let mut cache_manager = CacheManager::new(&config.claude_data_path);
+    let config = initialize_config();    
+    let config_duration = start.elapsed();
 
-    // Parse CLI first to see if we have a specific command
+    // Parse CLI first to get global flags
     let cli = Cli::parse();
+    
+    // Load cache (will automatically scan projects subdirectory)
+    let mut cache_manager = CacheManager::new(&config.claude_data_path, cli.no_cache);
+    let cache_duration = start.elapsed();
+
+    cache_manager.refresh_cache();
+    let file_duration = start.elapsed();
 
     // Execute the command  
     match cli.command.unwrap_or(Commands::Info) {
@@ -25,6 +36,22 @@ fn main() {
         Commands::Blocks => commands::blocks::run(&config),
 
         //Helper for debuging some part of code no use for real app
-        Commands::Debug { parse, cache, file, blocks, gaps, limits, files, no_cache } => commands::debug::run(&config, &mut cache_manager, parse, cache, file, blocks, gaps, limits, files, no_cache),
-    }
+        Commands::Debug { parse, cache, file, blocks, gaps, limits, files } => commands::debug::run(&config, &mut cache_manager, parse, cache, file, blocks, gaps, limits, files),
+    }    
+    let exec_duration = start.elapsed();
+
+    //You can alwasy check last cmd duration
+    let path = dirs::home_dir()
+        .unwrap_or_else(|| PathBuf::from("."))
+        .join(".claude-bar/last_exec");
+
+    let content = format!(
+        "Timestamp: {}\nConfig: {:.1} ms\nCache: {:.1} ms\nFile: {:.1} ms\nExec: {:.1} ms\n",
+        Utc::now().to_rfc3339(),
+        config_duration.as_secs_f64() * 1000.0,
+        cache_duration.as_secs_f64() * 1000.0,
+        file_duration.as_secs_f64() * 1000.0,
+        exec_duration.as_secs_f64() * 1000.0,
+    );
+    let _ = fs::write(path, content);
 }

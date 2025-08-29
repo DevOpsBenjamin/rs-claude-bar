@@ -3,6 +3,10 @@ use clap::{Parser, Subcommand};
 #[derive(Parser)]
 #[command(name = "rs-claude-bar", about = "Track Claude usage", version)]
 pub struct Cli {
+    /// Force bypass cache and reprocess all files
+    #[arg(long, global = true)]
+    pub no_cache: bool,
+    
     #[command(subcommand)]
     pub command: Option<Commands>,
 }
@@ -52,9 +56,6 @@ pub enum Commands {
         /// Show file system information for all Claude data folders and files
         #[arg(long)]
         files: bool,
-        /// Force full reparse without using cache (only works with --cache)
-        #[arg(long)]
-        no_cache: bool,
     },
 }
 

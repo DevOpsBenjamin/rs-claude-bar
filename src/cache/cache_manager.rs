@@ -1,22 +1,35 @@
-use crate::cache::{load_cache, set_file_info, CacheInfo};
+use crate::cache::{load_cache, set_file_info, refresh_cache, CacheInfo, CacheStatus};
+use std::fs;
 
 pub struct CacheManager {
     cache: CacheInfo,
+    base_path: String,
 }
 
 impl CacheManager {
-    pub fn new(base_path: &str) -> Self {
-        let mut cache = load_cache();
-        set_file_info(&mut cache, base_path);
-        Self { cache }
+    pub fn new(base_path: &str, no_cache: bool) -> Self {
+        let mut cache = match no_cache {
+            true => CacheInfo::default(),
+            false => load_cache(),
+        };
+        let mut cm = Self { cache, base_path: base_path.to_string() };
+        cm.set_file_info();
+        
+        cm
     }
 
-    pub fn set_file_info(&mut self, base_path: &str) {
-        set_file_info(&mut self.cache, base_path);
+    pub fn set_file_info(&mut self) {
+        set_file_info(&mut self.cache, &self.base_path);
     }
 
     pub fn get_cache(&self) -> &CacheInfo {
         &self.cache
+    }
+
+    /// Refresh all files marked as NeedsRefresh in the cache
+    /// Updates cache entries in memory without saving to disk
+    pub fn refresh_cache(&mut self) {        
+        refresh_cache(&mut self.cache, &self.base_path);
     }
 }
 
