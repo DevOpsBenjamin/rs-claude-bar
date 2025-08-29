@@ -11,7 +11,7 @@ use crate::{
         cache::{load_cache, save_cache, get_file_cache_status},
         file_system::scan_claude_folders,
     },
-    analyze::helpers_v2::{
+    analyzer::helpers_v2::{
         parse_file_since_boundary,
         group_entries_by_hour,
         round_to_hour_boundary,

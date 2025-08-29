@@ -1,5 +1,5 @@
 // Public modules that can be used as crate::module_name::*
-pub mod analyze;
+pub mod analyzer;
 pub mod claude_types;
 pub mod claudebar_types;
 pub mod config_manager;

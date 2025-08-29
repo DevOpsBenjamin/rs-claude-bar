@@ -1,7 +1,7 @@
 use chrono::{DateTime, Utc, Duration};
 use crate::{
     claudebar_types::config::StatsFile,
-    analyze::{BlockStatus, detect_block_status},
+    analyzer::{BlockStatus, detect_block_status},
     display::
     {
         items::

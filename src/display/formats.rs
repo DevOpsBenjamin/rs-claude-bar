@@ -123,31 +123,31 @@ pub fn format_model(model: &str, format: &DisplayFormat, emoji: &Option<String>)
 
 /// Format block status based on current state
 pub fn format_block_status(
-    status: &crate::analyze::BlockStatus, 
+    status: &crate::analyzer::BlockStatus, 
     format: &DisplayFormat,
     remaining_time: Option<Duration>
 ) -> String {
     match format {
         DisplayFormat::StatusIcon => {
             match status {
-                crate::analyze::BlockStatus::InCurrentBlock => "🟢".to_string(),
-                crate::analyze::BlockStatus::NeedNewBlock | 
-                crate::analyze::BlockStatus::BeforeCurrentBlock => "🔴".to_string(),
-                crate::analyze::BlockStatus::NoCurrentBlock => "🟡".to_string(),
+                crate::analyzer::BlockStatus::InCurrentBlock => "🟢".to_string(),
+                crate::analyzer::BlockStatus::NeedNewBlock | 
+                crate::analyzer::BlockStatus::BeforeCurrentBlock => "🔴".to_string(),
+                crate::analyzer::BlockStatus::NoCurrentBlock => "🟡".to_string(),
             }
         }
         DisplayFormat::Text => {
             match status {
-                crate::analyze::BlockStatus::InCurrentBlock => {
+                crate::analyzer::BlockStatus::InCurrentBlock => {
                     if let Some(remaining) = remaining_time {
                         format!("ACTIVE ({})", format_duration_human(remaining))
                     } else {
                         "ACTIVE".to_string()
                     }
                 }
-                crate::analyze::BlockStatus::NeedNewBlock => "LIMIT REACHED".to_string(),
-                crate::analyze::BlockStatus::BeforeCurrentBlock => "LIMIT".to_string(),
-                crate::analyze::BlockStatus::NoCurrentBlock => "NO BLOCK".to_string(),
+                crate::analyzer::BlockStatus::NeedNewBlock => "LIMIT REACHED".to_string(),
+                crate::analyzer::BlockStatus::BeforeCurrentBlock => "LIMIT".to_string(),
+                crate::analyzer::BlockStatus::NoCurrentBlock => "NO BLOCK".to_string(),
             }
         }
         _ => format_block_status(status, &DisplayFormat::Text, remaining_time),
