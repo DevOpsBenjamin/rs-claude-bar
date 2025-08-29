@@ -4,6 +4,7 @@ pub mod claude_types;
 pub mod claudebar_types;
 pub mod config_manager;
 pub mod display;
+pub mod helpers;
 pub mod status;
 pub mod utils;
 

@@ -22,6 +22,22 @@ use crate::{
     },
 };
 
+/// Public: load entries with caching strategy (like debug --files)
+pub fn load_entries_with_cache(base_path: &str) -> (Vec<ClaudeBarUsageEntry>, std::time::Duration) {
+    let start_time = std::time::Instant::now();
+    
+    // TODO: Implement file cache checking logic
+    // - Check if cache exists and is valid
+    // - Get file modification times
+    // - Only parse files that are newer than cache
+    // - For now, just load all entries as placeholder
+    
+    let entries = load_entries_since(base_path, None);
+    let duration = start_time.elapsed();
+    
+    (entries, duration)
+}
+
 /// Public: load every entry from `~/.claude/projects`-style path
 pub fn load_all_entries(base_path: &str) -> Vec<ClaudeBarUsageEntry> {
     load_entries_since(base_path, None)

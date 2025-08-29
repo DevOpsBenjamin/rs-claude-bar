@@ -6,7 +6,7 @@ use crate::{
     analyze::{
         parse_reset_time, 
         calculate_unlock_time,
-        load_all_entries
+        load_entries_with_cache
     },
     utils::formatting::{
         format_date,
@@ -43,9 +43,8 @@ pub fn run(config: &ConfigInfo) {
     );
     println!();
 
-    // Load ALL entries (blocks analysis needs historical data)
-    let start_time = std::time::Instant::now();
-    let mut all_entries = load_all_entries(&base_path);
+    // Load ALL entries with caching (blocks analysis needs historical data)
+    let (mut all_entries, load_duration) = load_entries_with_cache(&base_path);
     
     if all_entries.is_empty() {
         println!("❌ No usage entries found in {}!", base_path);
@@ -54,8 +53,6 @@ pub fn run(config: &ConfigInfo) {
 
     // Sort by timestamp (descending for analysis)
     all_entries.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
-    
-    let load_duration = start_time.elapsed();
 
     println!(
         "📈 Loaded {} entries from {} to {} (took {:.1}ms)",

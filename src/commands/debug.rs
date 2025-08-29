@@ -1,5 +1,6 @@
 use chrono::{DateTime, Utc};
 use crate::{
+    analyze::Analyzer,
     claude_types::transcript_entry::Entry,
     commands::shared_types::UsageBlock,
     common::colors::*,
@@ -43,7 +44,7 @@ struct FileParseStats {
     total_output_tokens: u32,
 }
 
-pub fn run(config: &ConfigInfo, parse: bool, file: Option<String>, blocks: bool, gaps: bool, limits: bool, files: bool) {
+pub fn run(config: &ConfigInfo, parse: bool, file: Option<String>, blocks: bool, gaps: bool, limits: bool, files: bool, no_cache: bool) {
     let base_path = format!("{}/projects", config.claude_data_path);
     let path = Path::new(&base_path);
 
@@ -61,9 +62,67 @@ pub fn run(config: &ConfigInfo, parse: bool, file: Option<String>, blocks: bool,
     } else if files {
         run_files_debug(&base_path);
     } else {
-        // Default behavior - show table view
-        run_parse_debug(&base_path);
+        // Default behavior - show table view (v2 with cache, old for reference)
+        if parse || no_cache {
+            run_parse_debug(&base_path); // Old version for reference / no-cache
+        } else {
+            run_parse_debug_v2(config, &base_path, no_cache); // New cached version
+        }
     }
+}
+
+fn run_parse_debug_v2(config: &ConfigInfo, base_path: &str, no_cache: bool) {
+    let cache_status = if no_cache { "No Cache" } else { "Cached" };
+    println!(
+        "{bold}{cyan}🔍 DEBUG: JSONL Parse Analysis V2 ({cache_status}){reset}",
+        bold = { BOLD },
+        cyan = { CYAN },
+        reset = { RESET },
+        cache_status = cache_status,
+    );
+    println!();
+
+    // Create analyzer with cache and config
+    let mut analyzer = Analyzer::new(config.clone());
+    
+    // Analyze files and determine which need parsing
+    let (needs_parsing, cached_files) = if no_cache {
+        // Force all files to be reparsed
+        let all_files = analyzer.scan_files(base_path);
+        (all_files, Vec::new())
+    } else {
+        analyzer.analyze_files(base_path)
+    };
+    
+    println!("📊 File Analysis Results:");
+    println!("  📝 Files needing parsing: {}", needs_parsing.len());
+    println!("  ✅ Files up-to-date in cache: {}", cached_files.len());
+    println!();
+    
+    if !needs_parsing.is_empty() {
+        println!("🔄 Parsing new/modified files:");
+        for file in &needs_parsing {
+            println!("   📄 {}/{}", file.folder_name, file.file_name);
+        }
+        
+        // Parse and cache files with per-hour info
+        analyzer.parse_and_cache_files(needs_parsing, no_cache);
+        
+        // TODO: Uncomment when feature is ready
+        // Save updated cache
+        // if let Err(e) = analyzer.save_cache() {
+        //     eprintln!("⚠️  Warning: Failed to save cache: {}", e);
+        // }
+        println!();
+    }
+    
+    if !cached_files.is_empty() {
+        println!("✅ Using cached data for {} files", cached_files.len());
+        println!();
+    }
+    
+    // TODO: Generate analysis table from cached per-hour data
+    println!("📈 Analysis complete! (Per-hour cache implementation pending)");
 }
 
 fn run_parse_debug(base_path: &str) {

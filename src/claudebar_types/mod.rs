@@ -5,3 +5,4 @@ pub mod blocks;
 pub mod file_info;
 pub mod cache;
 pub mod display;
+pub mod per_hour_log;

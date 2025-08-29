@@ -49,6 +49,9 @@ pub enum Commands {
         /// Show file system information for all Claude data folders and files
         #[arg(long)]
         files: bool,
+        /// Force full reparse without using cache (for development)
+        #[arg(long)]
+        no_cache: bool,
     },
 }
 
