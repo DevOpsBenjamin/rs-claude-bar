@@ -4,16 +4,18 @@ use crate::{
     common::colors::*, 
     config::{
         utils::{
-            generate_status_line,
-            generate_stat_with_format, 
             MetricDefinition, 
-            MetricRegistry, 
-            PromptData
+            MetricRegistry
         },
         ConfigManager,
         DisplayFormat,
         DisplayItem,
         StatusLineConfig
+    },
+    display::prompt::{
+        PromptData,
+        generate_status_line,
+        generate_stat_with_format, 
     }
 };
 
@@ -209,9 +211,9 @@ fn configure_separator(config: &mut StatusLineConfig) {
         4 => " → ".to_string(),
         5 => {
             print!("   Enter custom separator: ");
-            io::stdout().flush();
+            let _ = io::stdout().flush();
             let mut custom = String::new();
-            io::stdin().read_line(&mut custom);
+            let _ = io::stdin().read_line(&mut custom);
             custom.trim().to_string()
         },
         _ => " | ".to_string(),

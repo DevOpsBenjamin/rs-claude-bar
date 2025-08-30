@@ -1,5 +1,5 @@
 use crate::{
-    cli::ConfigCommands, common::colors::*, config::{utils::PromptData, ConfigManager}
+    cli::ConfigCommands, common::colors::*, config::ConfigManager, display::prompt::PromptData
 };
 
 pub fn run(config_cmd: Option<ConfigCommands>, config_manager: &mut ConfigManager, data: &PromptData) {

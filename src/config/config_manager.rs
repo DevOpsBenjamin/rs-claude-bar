@@ -1,13 +1,15 @@
-use crate::config::{        
+use crate::{
+    config::{        
         utils::{
             load_config, 
             run_claude_config,
             run_display_config, 
             save_config,
-            PromptData
         },
         ConfigInfo
-    };
+    },
+    display::prompt::PromptData,
+};
 
 pub struct ConfigManager {
     pub(in crate::config) config: ConfigInfo

@@ -8,7 +8,7 @@ use rs_claude_bar::config::ConfigManager;
 use rs_claude_bar::cache::CacheManager;
 use rs_claude_bar::analyze::Analyzer;
 use rs_claude_bar::cli::{Cli, Commands};
-use rs_claude_bar::config::utils::PromptData;
+use rs_claude_bar::display::prompt::PromptData;
 use rs_claude_bar::commands::{self};
 
 fn main() {
