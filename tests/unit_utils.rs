@@ -1,28 +1,25 @@
-use chrono::{Duration, DateTime, Utc, Timelike};
+use chrono::{DateTime, Duration, TimeZone, Timelike, Utc};
 
-use rs_claude_bar::utils::formatting::{
-    format_duration,
-    format_token_count,
-    format_file_size,
-    format_number_with_separators
-};
+use rs_claude_bar::utils::{formatting::{
+    format_duration, format_file_size, format_number_with_separators, format_token_count
+}, time_utils::round_to_hour_boundary};
 
 #[test]
 fn test_format_duration() {
-    assert_eq!(format_duration(Duration::seconds(0)), "0m");
-    assert_eq!(format_duration(Duration::seconds(30)), "0m");
-    assert_eq!(format_duration(Duration::seconds(60)), "1m");
-    assert_eq!(format_duration(Duration::seconds(3600)), "1h00m");
-    assert_eq!(format_duration(Duration::seconds(3690)), "1h01m");
-    assert_eq!(format_duration(Duration::minutes(90)), "1h30m");
-    assert_eq!(format_duration(Duration::minutes(125)), "2h05m");
+    assert_eq!(format_duration(Duration::seconds(0), 5), "0m");
+    assert_eq!(format_duration(Duration::seconds(30), 5), "0m");
+    assert_eq!(format_duration(Duration::seconds(60), 5), "1m");
+    assert_eq!(format_duration(Duration::seconds(3600), 5), "1h00m");
+    assert_eq!(format_duration(Duration::seconds(3690), 5), "1h01m");
+    assert_eq!(format_duration(Duration::minutes(90), 5), "1h30m");
+    assert_eq!(format_duration(Duration::minutes(125), 5), "2h05m");
 }
 
 #[test]
 fn test_format_token_count() {
-    assert_eq!(format_token_count(123), "123");
-    assert_eq!(format_token_count(1500), "1k");
-    assert_eq!(format_token_count(1_500_000), "1.5M");
+    assert_eq!(format_token_count(123, 5), "123");
+    assert_eq!(format_token_count(1500, 5), "1k");
+    assert_eq!(format_token_count(1_500_000, 5), "1.5M");
 }
 
 #[test]
