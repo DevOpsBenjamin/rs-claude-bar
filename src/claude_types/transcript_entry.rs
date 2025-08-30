@@ -4,7 +4,7 @@ use super::message::TranscriptMessage;
 /// Union type for different entry types in JSONL files
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
-pub enum Entry {
+pub enum ClaudeEntry {
     /// Session summary entries (simpler structure)
     Summary {
         #[serde(rename = "type")]
@@ -18,14 +18,13 @@ pub enum Entry {
     /// Fallback for any other JSON structure
     Unknown(serde_json::Value),
 }
-
-impl Entry {
+impl ClaudeEntry {
     /// Get the timestamp if available
     pub fn timestamp(&self) -> Option<&str> {
         match self {
-            Entry::Transcript(entry) => Some(&entry.timestamp),
-            Entry::Summary { .. } => None,
-            Entry::Unknown(value) => {
+            ClaudeEntry::Transcript(entry) => Some(&entry.timestamp),
+            ClaudeEntry::Summary { .. } => None,
+            ClaudeEntry::Unknown(value) => {
                 // Try to extract timestamp from unknown entry
                 value.get("timestamp").and_then(|v| v.as_str())
             }
@@ -35,18 +34,18 @@ impl Entry {
     /// Check if this entry has usage information
     pub fn has_usage(&self) -> bool {
         match self {
-            Entry::Transcript(entry) => entry.message.usage.is_some(),
-            Entry::Summary { .. } => false,
-            Entry::Unknown(_) => false,
+            ClaudeEntry::Transcript(entry) => entry.message.usage.is_some(),
+            ClaudeEntry::Summary { .. } => false,
+            ClaudeEntry::Unknown(_) => false,
         }
     }
     
     /// Get usage if available
     pub fn usage(&self) -> Option<&super::usage::MessageUsage> {
         match self {
-            Entry::Transcript(entry) => entry.message.usage.as_ref(),
-            Entry::Summary { .. } => None,
-            Entry::Unknown(_) => None,
+            ClaudeEntry::Transcript(entry) => entry.message.usage.as_ref(),
+            ClaudeEntry::Summary { .. } => None,
+            ClaudeEntry::Unknown(_) => None,
         }
     }
 }

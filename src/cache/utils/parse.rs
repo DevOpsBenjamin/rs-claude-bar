@@ -1,7 +1,7 @@
 use std::{collections::{HashMap, hash_map::Entry}, fs, path::{Path, PathBuf}};
 use chrono::{DateTime, Utc};
 
-use crate::cache::{CacheInfo, CacheStatus, CachedFile, CachedFolder};
+use crate::{cache::{CacheInfo, CacheStatus, CachedFile, CachedFolder}, claude_types::transcript_entry::ClaudeEntry};
 
 /// Refresh a single file by updating its cache status to Fresh
 /// This simulates processing the file content and updating cache data
@@ -40,68 +40,43 @@ fn refresh_single_file(file: &mut CachedFile, file_path: &PathBuf) {
     }
         */
 }
+
 /// Parse entries strictly newer than `boundary`.
 /// - If the file doesn't exist → returns an empty Vec (silent).
 /// - Otherwise: reverse-parse and stop when `timestamp <= boundary`,
 ///   then restore chronological order.
 pub fn parse_file_since_boundary(
-    file: &FileSystemInfo,
+    file_path: &str,
     boundary: DateTime<Utc>,
-) -> Vec<ClaudeBarUsageEntry> {
-    let content = match fs::read_to_string(&file.file_path) {
+) -> Vec<ClaudeEntry> {
+    let content = match fs::read_to_string(file_path) {
         Ok(s) => s,
-        Err(err) if err.kind() == io::ErrorKind::NotFound => return Vec::new(),
-        Err(_other) => return Vec::new(), // keep silent per your rule; log here if desired
+        Err(_)  => return Vec::new(),
     };
 
     let mut entries: Vec<_> = content
         .lines()
         .rev()
-        .filter_map(|line| parse_line(line, file))
-        .take_while(|entry| entry.timestamp > boundary)
+        .filter_map(|line| parse_line(line, file_path))
+        .take_while(|entry| 
+            {
+                let timestamp_str = entry.timestamp();
+                let timestamp = DateTime::parse_from_rfc3339(timestamp_str)
+                    .unwrap_or_else(|_| DateTime::from(Utc::now()));
+                timestamp > boundary
+            })
         .collect();
 
     entries.reverse();
     entries
 }
-/// Parse file entries since boundary timestamp (reverse optimization)
-pub fn parse_file_since_boundary(
-    file: &FileSystemInfo, 
-    boundary: DateTime<Utc>
-) -> Vec<ClaudeBarUsageEntry> {
-    let mut entries = Vec::new();
-    
-    let Ok(content) = fs::read_to_string(&file.file_path) else {
-        return entries;
-    };
-    
-    match boundary {
-        None => {
-            // No cache - parse everything normally
-            for line in content.lines() {
-                if let Some(entry) = parse_line(line, file) {
-                    entries.push(entry);
-                }
-            }
-        }
-        Some(since) => {
-            // Has cache - reverse parse until we hit cached hour boundary
-            let mut temp_entries = Vec::new();
-            
-            for line in content.lines().rev() {
-                if let Some(entry) = parse_line(line, file) {
-                    if entry.timestamp <= since {
-                        break; // Stop - this hour is already cached
-                    }
-                    temp_entries.push(entry);
-                }
-            }
-            
-            // Reverse back to chronological order
-            temp_entries.reverse();
-            entries = temp_entries;
-        }
+
+/// Parse single JSONL line into ClaudeBarUsageEntry
+pub fn parse_line(line: &str, file_path: &str) -> Option<ClaudeEntry> {
+    let line = line.trim();
+    if line.is_empty() {
+        return None;
     }
-    
-    entries
+
+    serde_json::from_str::<ClaudeEntry>(line);
 }
