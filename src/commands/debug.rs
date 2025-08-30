@@ -609,12 +609,12 @@ fn run_blocks_debug_cache(cache_manager: &CacheManager) {
 
     // Group into 5-hour windows and display
     let headers = vec![
-        HeaderInfo { label: "🕐 5-Hour Window", width: 15 },
-        HeaderInfo { label: "📊 Total Tokens", width: 12 },
-        HeaderInfo { label: "🤖 Assistant", width: 10 },
-        HeaderInfo { label: "👤 User", width: 8 },
-        HeaderInfo { label: "📝 Entries", width: 8 },
-        HeaderInfo { label: "💬 Content", width: 10 },
+        HeaderInfo::new("5-Hour Window",15),
+        HeaderInfo::new("Total Tokens",12),
+        HeaderInfo::new("Assistant",10),
+        HeaderInfo::new("User",8),
+        HeaderInfo::new("Entries",8),
+        HeaderInfo::new("Content",10),
     ];
     let mut tc = TableCreator::new(headers);
 
@@ -721,10 +721,10 @@ fn run_gaps_debug_cache(cache_manager: &CacheManager) {
 
     // Display gaps
     let headers = vec![
-        HeaderInfo { label: "🔚 Gap Start", width: 16 },
-        HeaderInfo { label: "🔛 Gap End", width: 16 },
-        HeaderInfo { label: "⏱️ Duration", width: 12 },
-        HeaderInfo { label: "📊 Gap Size", width: 10 },
+        HeaderInfo::new("Gap Start", 16 ),
+        HeaderInfo::new("Gap End",16 ),
+        HeaderInfo::new("Duration", 12 ),
+        HeaderInfo::new("Gap Size", 10 ),
     ];
     let mut tc = TableCreator::new(headers);
 
@@ -942,11 +942,11 @@ fn print_gaps_debug(blocks: &[UsageBlock]) {
     
     // Create table using TableCreator
     let headers = vec![
-        HeaderInfo { label: "Session Start", width: 19 },
-        HeaderInfo { label: "Session End", width: 19 },
-        HeaderInfo { label: "Duration", width: 10 },
-        HeaderInfo { label: "Entries", width: 7 },
-        HeaderInfo { label: "Status", width: 12 },
+        HeaderInfo::new("Session Start", 19),
+        HeaderInfo::new("Session End", 19),
+        HeaderInfo::new("Duration", 10),
+        HeaderInfo::new("Entries", 17),
+        HeaderInfo::new("Status", 12),
     ];
     let mut tc = TableCreator::new(headers);
     
@@ -1035,11 +1035,11 @@ fn run_limits_debug_cache(cache_manager: &CacheManager) {
 
     // Display table of limit events with dynamic widths
     let headers = vec![
-        HeaderInfo { label: "📁 Folder", width: max_folder_width },
-        HeaderInfo { label: "📄 File", width: max_file_width },
-        HeaderInfo { label: "⏰ Block Time", width: 11 },
-        HeaderInfo { label: "🔓 Unlock Time", width: 11 },
-        HeaderInfo { label: "⏱️ Reset", width: 4 },
+        HeaderInfo::new("Folder", max_folder_width),
+        HeaderInfo::new("File", max_file_width),
+        HeaderInfo::new("Block", 11),
+        HeaderInfo::new("Unlock", 11),
+        HeaderInfo::new("When", 4),
     ];
     let mut tc = TableCreator::new(headers);
 
@@ -1115,11 +1115,11 @@ fn run_files_debug(cache_manager: &mut CacheManager, base_path: &str) {
 
         // Create stylish table with your custom TableCreator - more compact!
         let headers = vec![
-            HeaderInfo { label: "File Name", width: 48 }, // -2
-            HeaderInfo { label: "Size", width: 9 },       // -2  
-            HeaderInfo { label: "Modified", width: 19 },  // -2
-            HeaderInfo { label: "Created", width: 19 },   // -2
-            HeaderInfo { label: "Cache", width: 10 }, // format_cache_status uses 10 chars
+            HeaderInfo::new("File Name", 48),
+            HeaderInfo::new("Size", 9),
+            HeaderInfo::new("Modified", 19)
+            HeaderInfo::new("Created", 19),
+            HeaderInfo::new("Cache", 10),
         ];
         let mut tc = TableCreator::new(headers);
         let mut fresh_count = 0;

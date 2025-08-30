@@ -95,13 +95,13 @@ pub fn run(config: &ConfigInfo) {
     
     //Table using Helper
     let headers = vec![
-        HeaderInfo { label: "Type", width: 6 },
-        HeaderInfo { label: "Start", width: 13 },
-        HeaderInfo { label: "End", width: 13 },
-        HeaderInfo { label: "Duration", width: 10 },
-        HeaderInfo { label: "Tokens", width: 9 },
-        HeaderInfo { label: "Messages", width: 12 },
-        HeaderInfo { label: "Status", width: 9 },
+        HeaderInfo::new("Type", 6),
+        HeaderInfo::new("Start", 13),
+        HeaderInfo::new("End", 13),
+        HeaderInfo::new("Duration", 10),
+        HeaderInfo::new("Tokens", 9),
+        HeaderInfo::new("Messages", 12),
+        HeaderInfo::new("Status", 9),
     ];
     let mut tc = TableCreator::new(headers);
 
@@ -456,13 +456,13 @@ fn print_blocks_debug(blocks: &[UsageBlock], all_entries: &[ClaudeBarUsageEntry]
 
     // Create table using TableCreator
     let headers = vec![
-        HeaderInfo { label: "Window Start", width: 14 },
-        HeaderInfo { label: "Window End", width: 14 },
-        HeaderInfo { label: "Reset", width: 7 },
-        HeaderInfo { label: "First Activity", width: 14 },
-        HeaderInfo { label: "Last Activity", width: 14 },
-        HeaderInfo { label: "Count", width: 5 },
-        HeaderInfo { label: "Tokens", width: 9 },
+        HeaderInfo::new("Window Start", 14),
+        HeaderInfo::new("Window End", 14),
+        HeaderInfo::new("Reset", 7),
+        HeaderInfo::new("First Activity", 14),
+        HeaderInfo::new("Last Activity", 14),
+        HeaderInfo::new("Count", 5),
+        HeaderInfo::new("Tokens", 9),
     ];
     let mut tc = TableCreator::new(headers);
 
@@ -532,11 +532,11 @@ fn print_gaps_debug(blocks: &[UsageBlock]) {
 
     // Create table using TableCreator  
     let headers = vec![
-        HeaderInfo { label: "Session Start", width: 19 },
-        HeaderInfo { label: "Session End", width: 19 },
-        HeaderInfo { label: "Duration", width: 8 },
-        HeaderInfo { label: "Entries", width: 7 },
-        HeaderInfo { label: "Status", width: 10 },
+        HeaderInfo::new("Session Start", 19),
+        HeaderInfo::new("Session End", 19),
+        HeaderInfo::new("Duration", 8),
+        HeaderInfo::new("Entries", 7),
+        HeaderInfo::new("Status", 10),
     ];
     let mut tc = TableCreator::new(headers);
 

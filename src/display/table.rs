@@ -11,12 +11,9 @@ pub struct TableCreator {
 }
 
 impl TableCreator {
-    pub fn new(headers: Vec<HeaderInfo>) -> Self {
-        Self { 
-            headers,
-            rows: Vec::new(),
-            has_warnings: false,
-        }
+    pub fn new(mut headers: Vec<HeaderInfo>) -> Self {
+        let has_warnings = Self::format_headers(&mut headers);
+        Self { headers, rows: Vec::new(), has_warnings }
     }
 
     /// Adds a row, formatting and padding immediately. Tracks any formatting problems.
@@ -32,15 +29,8 @@ impl TableCreator {
                     let content_len = value.chars().count();
                     if content_len > header.width {
                         bad_format = true;
-                        let suffix: String = value
-                            .chars()
-                            .rev()
-                            .take(header.width - 1)
-                            .collect::<String>()
-                            .chars()
-                            .rev()
-                            .collect();
-                        format!("{:>width$}", format!(".{}", suffix), width = header.width)
+                        let truncated = Self::truncate_with_dot(value, header.width);
+                        format!("{:>width$}", truncated, width = header.width)
                     } else {
                         format!("{:>width$}", value, width = header.width)
                     }
@@ -81,6 +71,35 @@ impl TableCreator {
         }
     }
 
+    /// Format headers in place, return true if any were truncated
+    fn format_headers(headers: &mut Vec<HeaderInfo>) -> bool {
+        let mut has_warnings = false;
+        for header in headers.iter_mut() {
+            let label_len = header.label.chars().count();
+            if label_len > header.width {
+                has_warnings = true;
+                header.label = Self::truncate_with_dot(&header.label, header.width);
+            } else {
+                header.label = format!("{:<width$}", &header.label, width = header.width)
+            }
+        }
+        has_warnings
+    }
+
+    /// Truncate text to width with dot prefix (e.g., "very long text" -> ".ext")
+    fn truncate_with_dot(text: &str, width: usize) -> String {
+        let suffix: String = text
+            .chars()
+            .rev()
+            .take(width - 1)
+            .collect::<String>()
+            .chars()
+            .rev()
+            .collect();
+            
+        format!(".{:<width$}", suffix, width = width-1)
+    }
+
     fn create_header(&self) {
          // Top border
         print!("{BOLD}┌");
@@ -89,14 +108,14 @@ impl TableCreator {
             if i < self.headers.len() - 1 {
                 print!("┬");
             } else {
-                print!("─┐{RESET}\n");
+                print!("┐{RESET}\n");
             }
         }
 
         // Header row
         print!("{BOLD}│");
         for h in &self.headers {
-            print!(" {:<width$} │", h.label, width = h.width);
+            print!(" {} │", h.label);
         }
         print!("{RESET}\n");
 
@@ -107,7 +126,7 @@ impl TableCreator {
             if i < self.headers.len() - 1 {
                 print!("┼");
             } else {
-                print!("─┤{RESET}\n");
+                print!("┤{RESET}\n");
             }
         }
     }
@@ -120,7 +139,7 @@ impl TableCreator {
             if i < self.headers.len() - 1 {
                 print!("┴");
             } else {
-                print!("─┘{RESET}\n");
+                print!("┘{RESET}\n");
             }
         }
     }
