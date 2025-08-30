@@ -80,8 +80,8 @@ fn configure_metric(
             enabled: true,
         });
         
-        let example = generate_format_example_mock(metric.stat_type.clone(), &selected_format);
-        println!("   ✅ Added: {}", example);
+        //let example = generate_format_example_mock(metric.stat_type.clone(), &selected_format);
+        println!("   ✅ Added: {}", "TOTO");
     } else {
         println!("   ⏭️  Skipped");
     }

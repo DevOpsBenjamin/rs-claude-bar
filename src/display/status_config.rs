@@ -420,7 +420,7 @@ pub fn generate_format_example_mock(stat_type: StatType, format: &DisplayFormat)
 
 fn format_number(num: i64) -> String {
     if num >= 1000 {
-        format!("{:,}", num)
+        format!("{}", num)
     } else {
         format!("{}", num)
     }
