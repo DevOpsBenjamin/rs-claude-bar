@@ -1,7 +1,6 @@
 use chrono::{DateTime, Utc, Duration};
 use crate::{
-    claudebar_types::config::StatsFile,
-    analyzer::{BlockStatus, detect_block_status},
+    analyzer::BlockStatus,
     display::
     {
         items::
@@ -14,12 +13,11 @@ use crate::{
         {
             format_model,
             format_tokens,
-            format_percentage,
-            format_token_ratio,
             format_block_status,
             format_duration_display,
+            format_message_count,
         }
-    }
+    }   
 };
 
 /// The Display Manager handles rendering the status line based on configuration
@@ -76,65 +74,32 @@ impl DisplayManager {
     fn render_item(&self, item: &DisplayItem, data: &DisplayData) -> String {
         match &item.stat_type {
             StatType::TokenUsage => {
-                format_tokens(data.current_tokens, data.max_tokens, &item.format, &item.emoji)
-            }
-            StatType::TokenPercentage => {
-                match &item.format {
-                    DisplayFormat::Ratio => {
-                        format_token_ratio(data.current_tokens, data.max_tokens, &item.format, &item.emoji)
-                    }
-                    _ => {
-                        if let Some(percentage) = data.percentage {
-                            format_percentage(percentage, &item.format, &item.emoji)
-                        } else {
-                            String::new()
-                        }
-                    }
-                }
+                format_tokens(data.current_tokens, data.max_tokens, &item.format)
             }
             StatType::TimeElapsed => {
                 if let Some(elapsed) = data.time_elapsed {
-                    format_duration_display(elapsed, &item.format, &item.emoji)
+                    format_duration_display(elapsed, &item.format)
                 } else {
                     String::new()
                 }
             }
             StatType::TimeRemaining => {
                 if let Some(remaining) = data.time_remaining {
-                    format_duration_display(remaining, &item.format, &item.emoji)
-                } else {
-                    String::new()
-                }
-            }
-            StatType::ResetTime => {
-                if let Some(reset) = data.reset_time {
-                    let emoji_str = item.emoji.as_deref().unwrap_or("🔄");
-                    match &item.format {
-                        DisplayFormat::Text => reset.format("%H:%M").to_string(),
-                        DisplayFormat::TextWithEmoji => format!("{} {}", emoji_str, reset.format("%H:%M")),
-                        DisplayFormat::Compact => reset.format("%H:%M").to_string(),
-                        _ => reset.format("%H:%M").to_string(),
-                    }
+                    format_duration_display(remaining, &item.format)
                 } else {
                     String::new()
                 }
             }
             StatType::Model => {
                 if let Some(model) = &data.model {
-                    format_model(model, &item.format, &item.emoji)
+                    format_model(model, &item.format)
                 } else {
                     String::new()
                 }
             }
             StatType::MessageCount => {
                 if let Some(count) = data.message_count {
-                    let emoji_str = item.emoji.as_deref().unwrap_or("💬");
-                    match &item.format {
-                        DisplayFormat::Text => format!("{} messages", count),
-                        DisplayFormat::TextWithEmoji => format!("{} {}", emoji_str, count),
-                        DisplayFormat::Compact => format!("{}", count),
-                        _ => format!("{}", count),
-                    }
+                    format_message_count(count, &item.format)
                 } else {
                     String::new()
                 }
@@ -145,6 +110,7 @@ impl DisplayManager {
         }
     }
     
+    /*
     /// Create DisplayData from StatsFile
     pub fn create_display_data(stats: &StatsFile) -> DisplayData {
         Self::create_display_data_with_model(stats, None)
@@ -153,7 +119,7 @@ impl DisplayManager {
     /// Create DisplayData from StatsFile with optional model info
     pub fn create_display_data_with_model(stats: &StatsFile, model_name: Option<String>) -> DisplayData {
         let now = Utc::now();
-        let block_status = detect_block_status(now, &stats.current);
+        
         
         let (current_tokens, time_elapsed, time_remaining, reset_time) = match &stats.current {
             Some(current) => {
@@ -182,15 +148,14 @@ impl DisplayManager {
             reset_time,
             model: model_name, // Use provided model name from Claude Code input
             message_count: None, // TODO: Count messages in current block
-            block_status,
+            block_status: BlockStatus::NeedNewBlock
         }
     }
-    
+     */
     /// Create default display configuration
     pub fn default_config() -> Vec<DisplayItem> {
         vec![
             DisplayItem::new(StatType::TokenUsage, DisplayFormat::TextWithEmoji),
-            DisplayItem::new(StatType::TokenPercentage, DisplayFormat::Ratio),
             DisplayItem::new(StatType::BlockStatus, DisplayFormat::StatusIcon),
             DisplayItem::new(StatType::MessageCount, DisplayFormat::TextWithEmoji),
             DisplayItem::new(StatType::TimeRemaining, DisplayFormat::TextWithEmoji), 

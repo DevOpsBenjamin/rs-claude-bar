@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 
 /// Essential limit detection data for cache storage
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct LimitInfo {
+struct LimitInfo {
     /// When the limit was hit
     pub timestamp: DateTime<Utc>,
     

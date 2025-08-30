@@ -223,10 +223,8 @@ fn add_display_item(config: &mut ConfigInfo) {
     println!("Available stat types:");
     let stat_types = [
         StatType::TokenUsage,
-        StatType::TokenPercentage, 
         StatType::TimeElapsed,
         StatType::TimeRemaining,
-        StatType::ResetTime,
         StatType::Model,
         StatType::MessageCount,
         StatType::BlockStatus,

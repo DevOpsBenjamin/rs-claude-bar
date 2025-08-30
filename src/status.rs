@@ -24,8 +24,10 @@ pub fn generate_status_with_config_and_model(config: &ConfigInfo, model_name: Op
         .with_separator(config.display.separator.clone());
     
     // Create display data from stats with model info
-    let display_data = DisplayManager::create_display_data_with_model(&stats, model_name);
+    //let display_data = DisplayManager::create_display_data_with_model(&stats, model_name);
     
     // Generate status line
-    Ok(display_manager.render_status_line(&display_data))
+    //Ok(display_manager.render_status_line(&display_data))
+
+    Ok("PLACEHOLDER".into())
 }

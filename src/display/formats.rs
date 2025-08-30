@@ -1,15 +1,15 @@
 use crate::common::colors::{RED, YELLOW, GREEN, RESET, BOLD};
-use crate::display::items::DisplayFormat;
+use crate::display::items::{DisplayFormat, DisplayItem, StatType};
 use chrono::Duration;
 
 /// Format a token count based on display format
-pub fn format_tokens(count: i64, max_tokens: Option<i64>, format: &DisplayFormat, emoji: &Option<String>) -> String {
+pub fn format_tokens(count: i64, max_tokens: Option<i64>, format: &DisplayFormat) -> String {
     match format {
         DisplayFormat::Text => {
             format!("{} tokens", format_number(count))
         }
         DisplayFormat::TextWithEmoji => {
-            let emoji_str = emoji.as_deref().unwrap_or("🧠");
+            let emoji_str = DisplayItem::default_emoji(&StatType::TokenUsage).unwrap();
             format!("{} {}", emoji_str, format_number(count))
         }
         DisplayFormat::Compact => {
@@ -36,13 +36,13 @@ pub fn format_tokens(count: i64, max_tokens: Option<i64>, format: &DisplayFormat
 }
 
 /// Format a percentage based on display format
-pub fn format_percentage(percentage: u8, format: &DisplayFormat, emoji: &Option<String>) -> String {
+pub fn format_percentage(percentage: u8, format: &DisplayFormat) -> String {
     match format {
         DisplayFormat::Text => {
             format!("{}%", percentage)
         }
         DisplayFormat::TextWithEmoji => {
-            let emoji_str = emoji.as_deref().unwrap_or("🧠");
+            let emoji_str = DisplayItem::default_emoji(&StatType::TokenUsage).unwrap();
             let color = percentage_color(percentage);
             format!("{} {}{}%{}", emoji_str, color, percentage, RESET)
         }
@@ -60,41 +60,24 @@ pub fn format_percentage(percentage: u8, format: &DisplayFormat, emoji: &Option<
 }
 
 /// Format a token ratio (current/max) based on display format  
-pub fn format_token_ratio(current: i64, max_tokens: Option<i64>, format: &DisplayFormat, emoji: &Option<String>) -> String {
+pub fn format_message_count(count: u32, format: &DisplayFormat) -> String {
     match format {
-        DisplayFormat::Ratio => {
-            if let Some(max) = max_tokens {
-                format!("{}/{}", format_number_compact(current), format_number_compact(max))
-            } else {
-                format_number_compact(current)
-            }
-        }
         DisplayFormat::TextWithEmoji => {
-            let emoji_str = emoji.as_deref().unwrap_or("🧠");
-            if let Some(max) = max_tokens {
-                format!("{} {}/{}", emoji_str, format_number_compact(current), format_number_compact(max))
-            } else {
-                format!("{} {}", emoji_str, format_number_compact(current))
-            }
+            let emoji_str = DisplayItem::default_emoji(&StatType::MessageCount).unwrap();
+            format!("{} {}", emoji_str, format_number_compact(count.into()))
         }
-        _ => {
-            if let Some(max) = max_tokens {
-                format!("{}/{}", format_number_compact(current), format_number_compact(max))
-            } else {
-                format_number_compact(current)
-            }
-        }
+        _ => format_number_compact(count.into()),
     }
 }
 
 /// Format a duration based on display format
-pub fn format_duration_display(duration: Duration, format: &DisplayFormat, emoji: &Option<String>) -> String {
+pub fn format_duration_display(duration: Duration, format: &DisplayFormat) -> String {
     let duration_str = format_duration_human(duration);
     
     match format {
         DisplayFormat::Text => duration_str,
         DisplayFormat::TextWithEmoji => {
-            let emoji_str = emoji.as_deref().unwrap_or("⏱️");
+            let emoji_str = DisplayItem::default_emoji(&StatType::TimeElapsed).unwrap();
             format!("{} {}", emoji_str, duration_str)
         }
         DisplayFormat::Compact => {
@@ -106,11 +89,11 @@ pub fn format_duration_display(duration: Duration, format: &DisplayFormat, emoji
 }
 
 /// Format model name based on display format
-pub fn format_model(model: &str, format: &DisplayFormat, emoji: &Option<String>) -> String {
+pub fn format_model(model: &str, format: &DisplayFormat) -> String {
     match format {
         DisplayFormat::Text => model.to_string(),
         DisplayFormat::TextWithEmoji => {
-            let emoji_str = emoji.as_deref().unwrap_or("🤖");
+            let emoji_str = DisplayItem::default_emoji(&StatType::Model).unwrap();
             format!("{} {}", emoji_str, model)
         }
         DisplayFormat::Compact => {

@@ -5,7 +5,7 @@ use crate::display::items::{DisplayItem, StatType, DisplayFormat};
 
 /// Simple block for stats storage
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SimpleBlock {
+struct SimpleBlock {
     pub start: DateTime<Utc>,
     pub end: DateTime<Utc>, 
     pub tokens: i64,
@@ -14,10 +14,6 @@ pub struct SimpleBlock {
 /// Stats file structure
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StatsFile {
-    /// Past completed blocks (ascending order by start)
-    pub past: Vec<SimpleBlock>,
-    /// Current active block (if any)
-    pub current: Option<SimpleBlock>,
     /// Last processed timestamp
     pub last_processed: Option<DateTime<Utc>>,
 }
@@ -72,7 +68,6 @@ impl Default for DisplayConfig {
             use_colors: true,
             items: vec![
                 DisplayItem::new(StatType::TokenUsage, DisplayFormat::TextWithEmoji),
-                DisplayItem::new(StatType::TokenPercentage, DisplayFormat::Ratio),
                 DisplayItem::new(StatType::BlockStatus, DisplayFormat::StatusIcon),
                 DisplayItem::new(StatType::MessageCount, DisplayFormat::TextWithEmoji),
                 DisplayItem::new(StatType::TimeRemaining, DisplayFormat::TextWithEmoji),
@@ -86,8 +81,6 @@ impl Default for DisplayConfig {
 impl Default for StatsFile {
     fn default() -> Self {
         Self {
-            past: Vec::new(),
-            current: None,
             last_processed: None,
         }
     }

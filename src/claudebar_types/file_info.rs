@@ -2,7 +2,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct FileSystemInfo {
+struct FileSystemInfo {
     pub file_name: String,
     pub modified_time: DateTime<Utc>,
     pub created_time: DateTime<Utc>,
@@ -10,7 +10,7 @@ pub struct FileSystemInfo {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct FolderInfo {
+struct FolderInfo {
     pub folder_name: String,
     pub files: Vec<FileSystemInfo>,
 }

@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CachedFileInfo {
+struct CachedFileInfo {
     pub name: String,
     pub file_name: String,
     pub folder_name: String,

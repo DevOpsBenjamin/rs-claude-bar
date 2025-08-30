@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 
 /// Per-hour aggregated data for cache storage
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PerHourLog {
+struct PerHourLog {
     /// Hour block start timestamp (e.g., 2025-08-29T14:00:00Z)
     pub hour_start: DateTime<Utc>,
     

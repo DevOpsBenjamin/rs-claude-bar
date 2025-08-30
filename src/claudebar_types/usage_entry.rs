@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 
 /// Simplified entry for Claude Bar usage tracking
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ClaudeBarUsageEntry {
+struct ClaudeBarUsageEntry {
     /// Session ID for grouping entries
     pub session_id: String,
 
@@ -34,14 +34,14 @@ pub struct ClaudeBarUsageEntry {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum UserRole {
+enum UserRole {
     User,
     Assistant,
     Unknown,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct TokenUsage {
+struct TokenUsage {
     pub input_tokens: u32,
     pub output_tokens: u32,
     pub cache_creation_tokens: u32,
@@ -50,7 +50,7 @@ pub struct TokenUsage {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct FileInfo {
+struct FileInfo {
     /// Folder name (e.g., "-workspace-git-rs-claude-bar")
     pub folder_name: String,
 
