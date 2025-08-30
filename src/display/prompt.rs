@@ -1,4 +1,4 @@
-use std::{io::{self, Read}, thread::current};
+use std::io::{self, Read};
 
 use crate::{
     claude_types::input::ClaudeCodeInput, 
