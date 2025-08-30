@@ -3,17 +3,21 @@ use std::collections::HashMap;
 use chrono::{DateTime, Utc};
 
 use crate::{
-    analyze::{build_limit_blocks, LimitBlock}, 
+    analyze::{build_limit_blocks_with_agg, build_per_hour_agg, LimitBlock, BlockData}, 
     cache::CacheInfo
 };
 
 pub struct Analyzer {
-    limit_blocks: HashMap<DateTime<Utc>, LimitBlock>
+    limit_blocks: HashMap<DateTime<Utc>, LimitBlock>,
+    per_hour_agg: HashMap<DateTime<Utc>, BlockData>,
 }
 impl Analyzer {
     pub fn new(cache: &CacheInfo) -> Self {
-        let limit_blocks = build_limit_blocks(cache);
-        Self { limit_blocks }
+        // Build flattened aggregates once; reuse across analyses
+        let per_hour_agg = build_per_hour_agg(cache);
+        // Build limit windows using the aggregated per-hour data
+        let limit_blocks = build_limit_blocks_with_agg(cache, &per_hour_agg);
+        Self { limit_blocks, per_hour_agg }
     }
 
     /// Return all limit blocks as a vector of (start, LimitBlock),
@@ -29,5 +33,15 @@ impl Analyzer {
         items.sort_by_key(|(_, lb)| lb.unlock_timestamp);
         items.reverse();
         items
+    }
+
+    /// Immutable view of limit blocks map (for callers that want direct access)
+    pub fn limit_blocks_map(&self) -> &HashMap<DateTime<Utc>, LimitBlock> {
+        &self.limit_blocks
+    }
+
+    /// Immutable view of per-hour aggregated usage across all files
+    pub fn per_hour_aggregate(&self) -> &HashMap<DateTime<Utc>, BlockData> {
+        &self.per_hour_agg
     }
 }

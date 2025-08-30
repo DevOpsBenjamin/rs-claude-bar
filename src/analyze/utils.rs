@@ -1,30 +1,122 @@
 use chrono::{DateTime, Utc, Duration};
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, hash_map::Entry};
 
-use crate::{analyze::{BlockData, LimitBlock}, cache::CacheInfo};
+use crate::{analyze::{DataBlock, LimitBlock}, cache::{CacheInfo, PerHourBlock}};
 
 // STEP 1: Find FIXED 5-hour windows from limit messages
-pub fn build_limit_blocks(cache: &CacheInfo) -> HashMap<DateTime<Utc>, LimitBlock> {    
+/// Flatten all per-hour usage across all files into a single map keyed by hour start.
+pub fn build_per_hour_agg(cache: &CacheInfo) -> (HashMap<DateTime<Utc>, LimitBlock>, HashMap<DateTime<Utc>, PerHourBlock>) {
     let mut limit_blocks: HashMap<DateTime<Utc>, LimitBlock> = HashMap::new();
+    let mut per_hour_block: HashMap<DateTime<Utc>, PerHourBlock> = HashMap::new();
 
+    for (_folder, folder) in &cache.folders {
+        for (_file, file) in &folder.files {
+            for (hour_start, ph) in &file.per_hour {
+
+                // Use HashMap entry API to distinguish new vs existing files
+                match per_hour_block.entry(*hour_start) {
+                    Entry::Vacant(entry) => {
+                        // New block not in current map
+                        entry.insert(PerHourBlock
+                        {
+                            hour_start: *hour_start,
+                            hour_end: ph.hour_end,
+                            min_timestamp: ph.min_timestamp,
+                            max_timestamp: ph.max_timestamp,
+                            input_tokens: 0,
+                            output_tokens: 0,
+                            cache_creation_tokens: 0,
+                            cache_read_tokens: 0,
+                            assistant_messages: 0,
+                            user_messages: 0,
+                            total_content_length: 0,
+                            entry_count: 0,
+                        });
+                    },
+                    Entry::Occupied(mut entry) => {
+                        // Existing block adding infos  compare dates to give good min max
+                        let block = entry.get_mut();
+                        block.min_timestamp = DateTime::min(block.min_timestamp, ph.min_timestamp);
+                        block.max_timestamp = DateTime::max(block.max_timestamp, ph.max_timestamp);
+                        block.input_tokens += ph.input_tokens as u32;
+                        block.output_tokens += ph.output_tokens as u32;
+                        block.cache_creation_tokens += ph.cache_creation_tokens as u32;
+                        block.cache_read_tokens += ph.cache_read_tokens as u32;
+                        block.assistant_messages += ph.assistant_messages as u32;
+                        block.user_messages += ph.user_messages as u32;
+                        block.total_content_length += ph.total_content_length as u64;
+                        block.entry_count += ph.entry_count as u32;
+                    }
+                }
+            }
+            for (_ts, block) in &file.blocks {
+                if let Some(unlock) = block.unlock_timestamp {
+                    let start = unlock - Duration::hours(5);
+                    limit_blocks.entry(start).or_insert(LimitBlock {
+                        unlock_timestamp: unlock,
+                    });
+                }
+            }
+        }
+    }
+
+    (limit_blocks, per_hour_block)
+}
+
+/// Build limit windows from cache limits and populate aggregates from pre-aggregated per-hour data.
+pub fn analyze_blocks(cache: &CacheInfo) -> HashMap<DateTime<Utc>, DataBlock> {
+    let (limit_blocks, per_hour) = build_per_hour_agg(cache);
+    let all_blocks = HashMap::new();
+
+    all_blocks
+}
+
+/* 
+/// Same as build_limit_blocks but reuse precomputed per-hour aggregates.
+pub fn build_limit_blocks_with_agg(
+    cache: &CacheInfo,
+    per_hour: &HashMap<DateTime<Utc>, BlockData>,
+) -> HashMap<DateTime<Utc>, LimitBlock> {
+    // Collect windows (start = unlock-5h)
+    let mut limit_blocks: HashMap<DateTime<Utc>, LimitBlock> = HashMap::new();
     for (_folder, folder) in &cache.folders {
         for (_file, file) in &folder.files {
             for (_ts, block) in &file.blocks {
                 if let Some(unlock) = block.unlock_timestamp {
                     let start = unlock - Duration::hours(5);
-                    limit_blocks.insert(start, 
-                        LimitBlock 
-                        {
-                            unlock_timestamp: unlock,
-                            datas: BlockData::default()
-                        });
+                    limit_blocks.entry(start).or_insert(LimitBlock {
+                        unlock_timestamp: unlock,
+                        datas: BlockData::default(),
+                    });
                 }
             }
         }
     }
+
+    // Populate aggregates from per_hour for each window
+    for (start, item) in limit_blocks.iter_mut() {
+        let mut agg = BlockData::default();
+        let mut h = *start;
+        while h < item.unlock_timestamp {
+            if let Some(b) = per_hour.get(&h) {
+                agg.input_tokens += b.input_tokens;
+                agg.output_tokens += b.output_tokens;
+                agg.cache_creation_tokens += b.cache_creation_tokens;
+                agg.cache_read_tokens += b.cache_read_tokens;
+                agg.total_tokens += b.total_tokens;
+                agg.assistant_messages += b.assistant_messages;
+                agg.user_messages += b.user_messages;
+                agg.total_content_length += b.total_content_length;
+                agg.entry_count += b.entry_count;
+            }
+            h = h + Duration::hours(1);
+        }
+        item.datas = agg;
+    }
+
     limit_blocks
 }
-
+*/
 /*
 fn analyze_usage_blocks(entries: &[ClaudeBarUsageEntry]) -> Vec<UsageBlock> {
     

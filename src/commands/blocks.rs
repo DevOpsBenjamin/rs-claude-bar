@@ -19,49 +19,34 @@ pub fn run(_config: &ConfigInfo, analyzer: &Analyzer) {
     let blocks = analyzer.limit_blocks_all();
     let top10 = blocks.into_iter().take(10).collect::<Vec<_>>();
 
-    // Table: Start | End (most recent first)
+    // Table: Start | End | Duration | Tokens | Messages | Status (most recent first)
     let headers = vec![
         HeaderInfo::new("Start", 19),
         HeaderInfo::new("End", 19),
-        
-        //HeaderInfo::new("Duration", 10),
-        //HeaderInfo::new("Tokens", 9),
-        //HeaderInfo::new("Messages", 12),
-        //HeaderInfo::new("Status", 9),
+        HeaderInfo::new("Duration", 10),
+        HeaderInfo::new("Tokens", 9),
+        HeaderInfo::new("Messages", 12),
+        HeaderInfo::new("Status", 9),
     ];
     let mut tc = TableCreator::new(headers);
     for (start, lb) in top10 {
-        /*
-        
-        let end_time = block
-            .end_time
-            .unwrap_or_else(Utc::now);
-        let duration = end_time.signed_duration_since(block.start_time);
-        let total_tokens: u32 = block.entries.iter().map(|e| e.usage.output_tokens).sum();
-        
-        // reset format
-        let reset_time = block.reset_time.as_deref().unwrap_or("?");
-        let mut type_display = format!("{:>6}", "PAST");
-        let mut status = format!("🔴 {:>4}", reset_time);
-        if end_time> Utc::now() {
-            type_display = format!("{:>6}", "NOW");
-            status = format!("🟢 {:>4}", reset_time);
-        }
+        let end = lb.unlock_timestamp;
+        let duration = end.signed_duration_since(start);
+        let hours = duration.num_hours();
+        let minutes = duration.num_minutes() - hours * 60;
+        let duration_str = format!("{}h {:02}m", hours, minutes);
+
+        let tokens = lb.datas.total_tokens;
+        let messages = lb.datas.assistant_messages + lb.datas.user_messages;
+        let status = "Complete"; // Limit-based windows are completed
 
         tc.add_row(vec![
-            type_display,
-            format_date(block.start_time, 11),
-            format_date(end_time, 11),
-            format_duration(duration, 8),
-            format_token_count(total_tokens, 7),
-            format!("{:>10}", block.assistant_count.to_string()),
-            status
-        ]);
-    }
-     */
-        tc.add_row(vec![
             format!("{}", start.format("%Y-%m-%d %H:%M UTC")),
-            format!("{}", lb.unlock_timestamp.format("%Y-%m-%d %H:%M UTC")),
+            format!("{}", end.format("%Y-%m-%d %H:%M UTC")),
+            format!("{:>10}", duration_str),
+            format!("{:>9}", tokens),
+            format!("{:>12}", messages),
+            format!("{:>9}", status),
         ]);
     }
     tc.display(false);
