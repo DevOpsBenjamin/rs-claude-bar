@@ -27,6 +27,9 @@ fn main() {
     cache_manager.refresh_cache();
     let file_duration = file.elapsed();
 
+    let analyze =  std::time::Instant::now();
+    let analyze_duration = file.elapsed();
+
     let exec = std::time::Instant::now();
     // Execute the command  
     match cli.command.unwrap_or(Commands::Info) {
@@ -58,11 +61,12 @@ fn main() {
         .join(".claude-bar/last_exec");
 
     let content = format!(
-        "Timestamp: {}\nConfig: {:.1} ms\nCache: {:.1} ms\nFile: {:.1} ms\nExec: {:.1} ms\nSave: {:.1} ms\nTotal: {:.1} ms\n",
+        "Timestamp: {}\nConfig: {:.1} ms\nCache: {:.1} ms\nFile: {:.1} ms\nAnalyze: {:.1} ms\nExec: {:.1} ms\nSave: {:.1} ms\nTotal: {:.1} ms\n",
         Utc::now().to_rfc3339(),
         config_duration.as_secs_f64() * 1000.0,
         cache_duration.as_secs_f64() * 1000.0,
         file_duration.as_secs_f64() * 1000.0,
+        analyze_duration.as_secs_f64() * 1000.0,
         exec_duration.as_secs_f64() * 1000.0,
         save_duration.as_secs_f64() * 1000.0,
         total_duration.as_secs_f64() * 1000.0,

@@ -1037,7 +1037,7 @@ fn run_limits_debug_cache(cache_manager: &CacheManager) {
     let headers = vec![
         HeaderInfo::new("Folder", max_folder_width),
         HeaderInfo::new("File", max_file_width),
-        HeaderInfo::new("Block", 11),
+        HeaderInfo::new("Date", 11),
         HeaderInfo::new("Unlock", 11),
         HeaderInfo::new("When", 4),
     ];
