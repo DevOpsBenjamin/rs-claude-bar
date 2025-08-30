@@ -1,4 +1,4 @@
-use std::io::{self, Read};
+use std::{io::{self, Read}, thread::current};
 
 use crate::{
     claude_types::input::ClaudeCodeInput, 
@@ -17,7 +17,7 @@ pub struct PromptData {
     pub time_elapsed_minutes: i32,
     pub time_remaining_hours: i32,
     pub time_remaining_minutes: i32,
-    pub message_count: i32,
+    pub message_count: i64,
     pub model_name: String,
     pub block_status: String,
     pub is_limited: bool,
@@ -29,20 +29,22 @@ impl  PromptData {
         let model_name = parse_claude_input()
             .map(|input| input.model.display_name)
             .unwrap_or_else(|| "Claude".to_string());
-        let _current = analyze.get_current();
-
+        let current = analyze.get_current();
+        let current_token = current.stats.output_tokens;
+        let max_token = analyze.output_token_max();
+        let percent = 100.0 * current_token as f64 / max_token as f64;
         Self {
-            tokens_used: 100,
-            tokens_limit: 1000,
-            progress_percent: 100.0/1000.0*100.0,
+            tokens_used: current.stats.output_tokens,
+            tokens_limit: max_token,
+            progress_percent: percent,
             time_elapsed_hours: 2,
             time_elapsed_minutes: 12,
             time_remaining_hours: 3,
             time_remaining_minutes: 23,
-            message_count: 43,
+            message_count: current.stats.assistant_messages + current.stats.user_messages,
             model_name: model_name,
             block_status: "ACTIVE".to_string(),
-            is_limited: false,
+            is_limited: current.unlock_timestamp.is_some(),
         }
     }
 }
