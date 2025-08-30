@@ -20,13 +20,14 @@ pub enum Commands {
     /// Show basic usage information
     Info,
     /// Show detailed Help with examples
-    Help,
+    Help{        
+        #[command(subcommand)]
+        command: Option<HelpCommands>,
+    },
     /// Show line prompt (basic use of the app)
     Prompt,
     /// Install command to configure Claude settings
     Install,
-    /// Interactively ask for display configuration
-    Display,
     /// Manage configuration settings
     Config {
         #[command(subcommand)]
@@ -34,14 +35,22 @@ pub enum Commands {
     },
     /// Display last 5-hour usage blocks
     Blocks,
+}
 
-
-    /// Debug parse JSONL files in specified directory
-    Debug {
-        /// Show limit messages found
-        #[arg(long)]
-        limits: bool,
-    },
+#[derive(Subcommand, Clone)]
+pub enum HelpCommands {
+    /// Configure Claude data path
+    #[command(name = "config")]
+    Config,
+    /// Configure Claude data path
+    #[command(name = "prompt")]
+    Prompt,
+    /// Configure Claude data path
+    #[command(name = "install")]
+    Install,
+    /// Configure Claude data path
+    #[command(name = "blocks")]
+    Blocks,    
 }
 
 #[derive(Subcommand, Clone)]

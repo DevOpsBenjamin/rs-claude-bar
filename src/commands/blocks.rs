@@ -1,15 +1,11 @@
 use crate::{
     analyze::Analyzer,
-    display::table::TableCreator,
-    claudebar_types::{
-        config::ConfigInfo,
-        display::HeaderInfo,
-    },
+    table::{TableCreator, HeaderInfo},
     common::colors::*,
 };
 
 /// Minimal `blocks` implementation: use Analyzer’s limit blocks and display last 10.
-pub fn run(_config: &ConfigInfo, analyzer: &Analyzer) {
+pub fn run(analyzer: &Analyzer) {
     println!(
         "{bold}{cyan}📊 5-Hour Usage Blocks (limits){reset}",
         bold = { BOLD }, cyan = { CYAN }, reset = { RESET }

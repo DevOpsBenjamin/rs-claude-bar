@@ -30,11 +30,13 @@ impl Analyzer {
         v
     }
 
-    /// Find the current active block at the given timestamp
-    pub fn find_current_block(&self, now: DateTime<Utc>) -> Option<&DataBlock> {
+    pub fn get_current(&self) -> DataBlock {
         self.data_blocks
             .values()
-            .find(|block| now >= block.start && now < block.end)
+            .filter(|b| matches!(b.kind, BlockKind::Current))
+            .cloned()
+            .next()
+            .unwrap()
     }
 
     /// Get all blocks (for debug purposes)

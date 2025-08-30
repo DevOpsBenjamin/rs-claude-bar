@@ -1,39 +1,37 @@
 use std::io::{self, Write};
+
 use crate::{
-    claudebar_types::config::ConfigInfo,
-    display::status_config::{
-        MetricRegistry, StatusLineConfig, DisplayItem, generate_format_example_mock
-    },
-    common::colors::*,
+    common::colors::*, 
+    config::{
+        utils::{
+            generate_status_line,
+            generate_stat_with_format, 
+            MetricDefinition, 
+            MetricRegistry, 
+            PromptData
+        },
+        ConfigManager,
+        DisplayFormat,
+        DisplayItem,
+        StatusLineConfig
+    }
 };
 
-pub fn run(config: &ConfigInfo) {
-    match run_interactive_config(config) {
-        Ok(_) => {},
-        Err(e) => eprintln!("Error configuring display: {}", e),
-    }
-}
+pub fn run_display_config(config_manager: &mut ConfigManager, data: &PromptData) {
+    let mut prompt_config: &mut StatusLineConfig = &mut config_manager.config.display;
 
-pub fn run_interactive_config(config: &ConfigInfo) -> Result<(), Box<dyn std::error::Error>> {
-    println!("🎨 {bold}{cyan}Configure your Claude Code status line{reset}\n", 
-        bold = BOLD, cyan = CYAN, reset = RESET);
-    
-    let registry = MetricRegistry::new();
-    let mut status_config = load_or_default_status_config(config)?;
-    
+    let registry = MetricRegistry::new();    
     loop {
-        show_main_menu(&status_config)?;
+        show_main_menu(data,&prompt_config);
         
-        let choice = get_menu_choice(1, 5)?;
+        let choice = get_menu_choice(1, 5);
         
         match choice {
-            1 => add_item_interactive(&mut status_config, &registry)?,
-            2 => remove_item_interactive(&mut status_config)?,
-            3 => configure_separator(&mut status_config)?,
+            1 => add_item_interactive(data, &mut prompt_config, &registry),
+            2 => remove_item_interactive(data, &mut prompt_config),
+            3 => configure_separator(&mut prompt_config),
             4 => {
-                save_status_config(config, &status_config)?;
-                println!("✅ Status line configuration saved!");
-                println!("   Use `rs-claude-bar prompt` to see your customized status line.");
+                config_manager.save_config();
                 break;
             },
             5 => {
@@ -43,11 +41,12 @@ pub fn run_interactive_config(config: &ConfigInfo) -> Result<(), Box<dyn std::er
             _ => continue,
         }
     }
-    
-    Ok(())
 }
 
-fn show_main_menu(config: &StatusLineConfig) -> Result<(), Box<dyn std::error::Error>> {
+fn show_main_menu(
+    data: &PromptData,
+    config: &StatusLineConfig
+) {
     // Clear console
     print!("\x1b[2J\x1b[1;1H");
     
@@ -55,7 +54,7 @@ fn show_main_menu(config: &StatusLineConfig) -> Result<(), Box<dyn std::error::E
         bold = BOLD, cyan = CYAN, reset = RESET);
     
     println!("{bold}Current Status Line:{reset} {}", 
-        generate_status_line_preview(config),
+        generate_status_line(data,config),
         bold = BOLD, 
         reset = RESET
     );
@@ -68,14 +67,13 @@ fn show_main_menu(config: &StatusLineConfig) -> Result<(), Box<dyn std::error::E
     println!("4) 💾 Save & Exit");
     println!("5) ❌ Exit without saving");
     println!();
-    
-    Ok(())
 }
 
 fn add_item_interactive(
-    config: &mut StatusLineConfig,
+    data: &PromptData,
+    prompt_config: &mut StatusLineConfig,
     registry: &MetricRegistry
-) -> Result<(), Box<dyn std::error::Error>> {
+) {
     // Clear console for clean interface
     print!("\x1b[2J\x1b[1;1H");
     
@@ -86,27 +84,25 @@ fn add_item_interactive(
     
     println!("\n{bold}Available Items:{reset}", bold = BOLD, reset = RESET);
     for (i, metric) in available_metrics.iter().enumerate() {
-        let example = generate_format_example_mock(metric.stat_type.clone(), &metric.default_format);
+        let example = generate_stat_with_format(&data, &metric.stat_type, &metric.default_format);
         println!("{}) {:16} - {}", i + 1, metric.name, example);
-    }
-    
+    }    
     println!();
-    let choice = get_menu_choice(0, available_metrics.len())?;
+    let choice = get_menu_choice(0, available_metrics.len());
     
     if choice == 0 {
-        return Ok(());
+        return;
     }
     
     let selected_metric = &available_metrics[choice - 1];
-    configure_item_format(config, selected_metric)?;
-    
-    Ok(())
+    configure_item_format(data, prompt_config, selected_metric);
 }
 
 fn configure_item_format(
-    config: &mut StatusLineConfig,
-    metric: &crate::display::status_config::MetricDefinition
-) -> Result<(), Box<dyn std::error::Error>> {
+    data: &PromptData,
+    prompt_config: &mut StatusLineConfig,
+    metric: &MetricDefinition,
+) {
     // Clear console for clean interface
     print!("\x1b[2J\x1b[1;1H");
     
@@ -115,7 +111,7 @@ fn configure_item_format(
     
     println!("\n   {bold}Available formats:{reset}", bold = BOLD, reset = RESET);
     for (i, format) in metric.supported_formats.iter().enumerate() {
-        let example = generate_format_example_mock(metric.stat_type.clone(), format);
+        let example = generate_stat_with_format(&data, &metric.stat_type, format);
         let is_default = format == &metric.default_format;
         let default_marker = if is_default { " (default)" } else { "" };
         
@@ -128,71 +124,71 @@ fn configure_item_format(
     }
     
     println!();
-    let choice = get_menu_choice(1, metric.supported_formats.len())?;
+    let choice = get_menu_choice(1, metric.supported_formats.len());
     let selected_format = metric.supported_formats[choice - 1].clone();
     
-    config.items.push(DisplayItem {
+    prompt_config.items.push(DisplayItem {
         stat_type: metric.stat_type.clone(),
         format: selected_format.clone(),
         enabled: true,
     });
-    
-    
-    Ok(())
 }
 
-fn remove_item_interactive(config: &mut StatusLineConfig) -> Result<(), Box<dyn std::error::Error>> {
+fn remove_item_interactive(
+    data: &PromptData,
+    config: &mut StatusLineConfig
+) {
     // Clear console for clean interface
     print!("\x1b[2J\x1b[1;1H");
     
     if config.items.is_empty() {
-        return Ok(());
+        return;
     }
     
     println!("🗑️  {bold}Remove Status Item{reset}", bold = BOLD, reset = RESET);
     println!("\n{bold}Current Items:{reset}", bold = BOLD, reset = RESET);
     
     for (i, item) in config.items.iter().enumerate() {
-        let example = generate_format_example_mock(item.stat_type.clone(), &item.format);
+        let example = generate_stat_with_format(&data, &item.stat_type, &item.format);
         println!("{}) {}", i + 1, example);
     }
     
     println!();
-    let choice = get_menu_choice(0, config.items.len())?;
+    let choice = get_menu_choice(0, config.items.len());
     
     if choice == 0 {
-        return Ok(());
+        return;
     }
     
     config.items.remove(choice - 1);
-    
-    Ok(())
 }
 
-
-fn get_menu_choice(min: usize, max: usize) -> Result<usize, Box<dyn std::error::Error>> {
+fn get_menu_choice(min: usize, max: usize) -> usize {
     loop {
         print!("Choice [{}-{}]: ", min, max);
-        io::stdout().flush()?;
-        
+        // On flush error, just fall back to min
+        if io::stdout().flush().is_err() {
+            return min;
+        }
+
         let mut input = String::new();
         match io::stdin().read_line(&mut input) {
-            Ok(0) => return Err("EOF reached".into()), // No input available
+            Ok(0) => return min, // EOF/no input: fall back to min
             Ok(_) => {
                 let input = input.trim();
                 if let Ok(choice) = input.parse::<usize>() {
-                    if choice >= min && choice <= max {
-                        return Ok(choice);
+                    if (min..=max).contains(&choice) {
+                        return choice;
                     }
                 }
                 println!("   Invalid choice, try again.");
             }
-            Err(e) => return Err(e.into()),
+            Err(_) => return min, // Read error: fall back to min
         }
     }
 }
 
-fn configure_separator(config: &mut StatusLineConfig) -> Result<(), Box<dyn std::error::Error>> {
+fn configure_separator(config: &mut StatusLineConfig) {
     // Clear console for clean interface
     print!("\x1b[2J\x1b[1;1H");
     
@@ -205,7 +201,7 @@ fn configure_separator(config: &mut StatusLineConfig) -> Result<(), Box<dyn std:
     println!("   5) Custom");
     
     println!();
-    let choice = get_menu_choice(1, 5)?;
+    let choice = get_menu_choice(1, 5);
     
     config.separator = match choice {
         2 => " • ".to_string(),
@@ -213,21 +209,17 @@ fn configure_separator(config: &mut StatusLineConfig) -> Result<(), Box<dyn std:
         4 => " → ".to_string(),
         5 => {
             print!("   Enter custom separator: ");
-            io::stdout().flush()?;
+            io::stdout().flush();
             let mut custom = String::new();
-            io::stdin().read_line(&mut custom)?;
+            io::stdin().read_line(&mut custom);
             custom.trim().to_string()
         },
         _ => " | ".to_string(),
     };
-    
-    
-    Ok(())
 }
 
 
-fn format_name(format: &crate::display::status_config::DisplayFormat) -> &'static str {
-    use crate::display::status_config::DisplayFormat;
+fn format_name(format: &DisplayFormat) -> &'static str {
     match format {
         DisplayFormat::Text => "Text",
         DisplayFormat::TextWithEmoji => "With Emoji",
@@ -241,55 +233,5 @@ fn format_name(format: &crate::display::status_config::DisplayFormat) -> &'stati
         DisplayFormat::StatusText => "Text Status",
         DisplayFormat::StatusColored => "Colored",
         DisplayFormat::Hidden => "Hidden",
-    }
-}
-
-
-fn load_or_default_status_config(_config: &ConfigInfo) -> Result<StatusLineConfig, Box<dyn std::error::Error>> {
-    use std::fs;
-    
-    let home = dirs::home_dir().unwrap_or_else(|| std::path::PathBuf::from("."));
-    let config_file = home.join(".claude-bar").join("status_config.json");
-    
-    // Try to load existing config
-    if config_file.exists() {
-        let json = fs::read_to_string(&config_file)?;
-        let status_config: StatusLineConfig = serde_json::from_str(&json)?;
-        Ok(status_config)
-    } else {
-        // Return default config if file doesn't exist
-        Ok(StatusLineConfig::default())
-    }
-}
-
-fn save_status_config(_config: &ConfigInfo, status_config: &StatusLineConfig) -> Result<(), Box<dyn std::error::Error>> {
-    use std::fs;
-    use serde_json;
-    
-    // Save to ~/.claude-bar/status_config.json
-    let home = dirs::home_dir().unwrap_or_else(|| std::path::PathBuf::from("."));
-    let config_dir = home.join(".claude-bar");
-    let config_file = config_dir.join("status_config.json");
-    
-    // Ensure directory exists
-    fs::create_dir_all(&config_dir)?;
-    
-    // Save the status config
-    let json = serde_json::to_string_pretty(&status_config)?;
-    fs::write(&config_file, json)?;
-    
-    Ok(())
-}
-
-fn generate_status_line_preview(config: &StatusLineConfig) -> String {
-    let previews: Vec<String> = config.items.iter()
-        .filter(|item| item.enabled)
-        .map(|item| generate_format_example_mock(item.stat_type.clone(), &item.format))
-        .collect();
-    
-    if previews.is_empty() {
-        "💤 No items configured".to_string()
-    } else {
-        previews.join(&config.separator)
     }
 }

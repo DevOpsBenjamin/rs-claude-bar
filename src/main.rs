@@ -4,16 +4,19 @@ use std::fs;
 use std::path::PathBuf;
 use chrono::Utc;
 
-use rs_claude_bar::config_manager::initialize_config;
+use rs_claude_bar::config::ConfigManager;
 use rs_claude_bar::cache::CacheManager;
 use rs_claude_bar::analyze::Analyzer;
 use rs_claude_bar::cli::{Cli, Commands};
-use rs_claude_bar::commands;
+use rs_claude_bar::config::utils::PromptData;
+use rs_claude_bar::commands::{self};
 
 fn main() {
     let start = Instant::now();
+    
     // Initialize configuration (creates folder and file if needed)
-    let config = initialize_config();    
+    let mut config_manager = ConfigManager::new();
+    let config = config_manager.get_config();
     let config_duration = start.elapsed();
 
     // Parse CLI first to get global flags
@@ -30,21 +33,18 @@ fn main() {
 
     let analyze =  Instant::now();
     let analyzer = Analyzer::new(cache_manager.get_cache());
+    let prompt_data = PromptData::new(&analyzer);
     let analyze_duration = analyze.elapsed();
 
     let exec = Instant::now();
     // Execute the command  
     match cli.command.unwrap_or(Commands::Info) {
-        Commands::Info => commands::info::run(&config),
-        Commands::Install => commands::install::run(&config),
-        Commands::Help => commands::help::run(&config),
-        Commands::Prompt => commands::prompt::run(&config, &analyzer),
-        Commands::Display => commands::display::run(&config),
-        Commands::Config { command } => commands::config::run(command, &config),
-        Commands::Blocks => commands::blocks::run(&config, &analyzer),
-
-        //Helper for debuging some part of code no use for real app
-        Commands::Debug { limits } => commands::debug::run(&config, &mut cache_manager, limits),
+        Commands::Info => commands::info::run(),
+        Commands::Install => commands::install::run(),        
+        Commands::Help { command } => commands::help::run(command),
+        Commands::Prompt => commands::prompt::run(&config, &prompt_data),
+        Commands::Config { command } => commands::config::run(command, &mut config_manager, &prompt_data),
+        Commands::Blocks => commands::blocks::run(&analyzer),
     }    
     let exec_duration = exec.elapsed();
 

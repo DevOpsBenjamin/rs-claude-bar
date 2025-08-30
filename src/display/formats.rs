@@ -1,7 +1,4 @@
 use crate::common::colors::{RED, YELLOW, GREEN, RESET, BOLD};
-use crate::display::items::{DisplayFormat, DisplayItem, StatType};
-use chrono::Duration;
-
 /*
 /// Format a token count based on display format
 pub fn format_tokens(count: i64, max_tokens: Option<i64>, format: &DisplayFormat) -> String {

@@ -1,12 +1,8 @@
 use crate::{
     common::colors::*,
-    claudebar_types::{
-        config::ConfigInfo
-    }
 };
 
-
-pub fn run(_config: &ConfigInfo) {
+pub fn run() {
     let info_text = format!(
         r#"
 {bold}{cyan}🤖 Claude Bar{reset} - Claude Code Usage Tracker

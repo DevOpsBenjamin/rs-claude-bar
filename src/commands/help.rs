@@ -1,12 +1,10 @@
 
 use crate::{
-    common::colors::*,
-    claudebar_types::{
-        config::ConfigInfo
-    }
+    cli::HelpCommands,
+    common::colors::*
 };
 
-pub fn run(_config: &ConfigInfo) {
+pub fn run(_help_cmd: Option<HelpCommands>, ) {
     let help_text = format!(
         r#"
 {bold}{cyan}🤖 Claude Bar - Enhanced Claude Code Usage Tracker{reset}

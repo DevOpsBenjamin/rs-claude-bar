@@ -1,5 +1,5 @@
 use crate::{
-    claudebar_types::display::HeaderInfo,   
+    table::HeaderInfo,   
     common::colors::*,
 };
 

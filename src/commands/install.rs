@@ -1,48 +1,56 @@
-use crate::claudebar_types::config::ConfigInfo;
-use serde_json::{json, Value};
-use std::fs;
+use std::{fs, path::PathBuf};
+use serde::{Deserialize, Serialize};
 
-pub fn run(_config: &ConfigInfo) {
-    // Determine settings file path
-    let mut home = match dirs::home_dir() {
-        Some(path) => path,
-        None => {
-            eprintln!("Could not determine home directory");
-            return;
+#[derive(Debug, Serialize, Deserialize, Default)]
+struct Settings {
+    #[serde(default)]
+    #[serde(rename = "statusLine")]
+    status_line: StatusLine,
+    // keep any extra keys we don't model
+    #[serde(flatten)]
+    extra: serde_json::Map<String, serde_json::Value>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct StatusLine {
+    #[serde(rename = "type")]
+    kind: String,
+    command: String,
+    padding: u32,
+}
+impl Default for StatusLine {
+    fn default() -> Self {
+        Self {
+            kind: "command".into(),
+            command: "rs-claude-bar prompt".into(),
+            padding: 0,
         }
-    };
-    home.push(".claude");
+    }
+}
 
-    let path = home.join("settings.json");
+fn settings_path() -> PathBuf {
+    dirs::home_dir()
+        .unwrap_or_default()
+        .join(".claude")
+        .join("settings.json")
+}
 
-    // Ensure directory exists
+pub fn run() {
+    let path = settings_path();
     if let Some(parent) = path.parent() {
-        if let Err(err) = fs::create_dir_all(parent) {
-            eprintln!("Error creating settings directory: {}", err);
-            return;
-        }
+        fs::create_dir_all(parent).unwrap();
     }
 
-    // Read existing content if file exists
-    let contents = fs::read_to_string(&path).unwrap_or_else(|_| "{}".to_string());
-    let mut data: Value = serde_json::from_str(&contents).unwrap_or_else(|_| json!({}));
+    // Load or default
+    let mut settings: Settings = fs::read_to_string(&path)
+        .ok()
+        .and_then(|s| serde_json::from_str(&s).ok())
+        .unwrap_or_default();
 
-    // Ensure statusLine section exists
-    if !data.get("statusLine").is_some() {
-        data["statusLine"] = json!({
-            "type": "command",
-            "command": "rs-claude-bar prompt",
-            "padding": 0
-        });
-    } else if let Some(obj) = data.get_mut("statusLine").and_then(|v| v.as_object_mut()) {
-        obj.insert(
-            "command".to_string(),
-            Value::String("rs-claude-bar prompt".to_string()),
-        );
-    }
+    // Ensure the command is what we want
+    settings.status_line.command = "rs-claude-bar prompt".into();
 
-    // Write back to file
-    if let Err(err) = fs::write(&path, serde_json::to_string_pretty(&data).unwrap()) {
-        eprintln!("Error writing settings file: {}", err);
-    }
+    // Save
+    let json = serde_json::to_string_pretty(&settings).unwrap();
+    let _ = fs::write(path, json);
 }

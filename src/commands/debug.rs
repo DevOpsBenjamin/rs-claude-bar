@@ -1,27 +1,15 @@
 use crate::{
     cache::CacheManager,
     common::colors::*,
-    claudebar_types::{
-        config::ConfigInfo,
-        display::HeaderInfo,
-    },
-    display::table::TableCreator,
-    formatting::{
+    table::{
+        TableCreator,
+        HeaderInfo,
         format_date,
         format_text,
     }
 };
-use std::path::Path;
 
-pub fn run(config: &ConfigInfo, cache_manager: &mut CacheManager, limits: bool) {
-    let base_path = format!("{}/projects", config.claude_data_path);
-    let path = Path::new(&base_path);
-
-    if !path.exists() {
-        eprintln!("Path does not exist: {}", base_path);
-        return;
-    }
-
+pub fn run(cache_manager: &CacheManager, limits: bool) {
     if limits {
         run_limits_debug_cache(cache_manager);
     }

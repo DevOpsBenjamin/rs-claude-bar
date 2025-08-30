@@ -5,4 +5,3 @@ pub mod help;
 pub mod info;
 pub mod install;
 pub mod prompt;
-pub mod display;
