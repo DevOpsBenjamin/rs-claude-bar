@@ -25,9 +25,8 @@ pub enum Commands {
     Prompt,
     /// Install command to configure Claude settings
     Install,
-    /// Interactively reset display configuration
-    #[command(name = "display-config")]
-    DisplayConfig,
+    /// Interactively ask for display configuration
+    Display,
     /// Manage configuration settings
     Config {
         #[command(subcommand)]
@@ -39,27 +38,9 @@ pub enum Commands {
 
     /// Debug parse JSONL files in specified directory
     Debug {
-        /// Show detailed parsing statistics with ANSI table for all files (V1 - reliable)
-        #[arg(long)]
-        parse: bool,
-        /// Use new cached analysis system (V2 - development)
-        #[arg(long)]
-        cache: bool,
-        /// Target specific file for detailed error analysis
-        #[arg(long, value_name = "FILEPATH")]
-        file: Option<String>,
-        /// Show blocks debug information
-        #[arg(long)]
-        blocks: bool,
-        /// Show gaps analysis (sessions with gaps > 1 hour)
-        #[arg(long)]
-        gaps: bool,
-        /// Show limit messages analysis
+        /// Show limit messages found
         #[arg(long)]
         limits: bool,
-        /// Show file system information for all Claude data folders and files
-        #[arg(long)]
-        files: bool,
     },
 }
 

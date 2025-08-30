@@ -29,6 +29,7 @@ fn main() {
     let file_duration = file.elapsed();
 
     let analyze =  std::time::Instant::now();
+    let mut analyzer = Analyzer::new(cache_manager.get_cache());
     let analyze_duration = file.elapsed();
 
     let exec = std::time::Instant::now();
@@ -38,12 +39,12 @@ fn main() {
         Commands::Install => commands::install::run(&config),
         Commands::Help => commands::help::run(&config),
         Commands::Prompt => commands::prompt::run(&config),
-        Commands::DisplayConfig => commands::display_config::run(&config),
+        Commands::Display => commands::display::run(&config),
         Commands::Config { command } => commands::config::run(command, &config),
         Commands::Blocks => commands::blocks::run(&config),
 
         //Helper for debuging some part of code no use for real app
-        Commands::Debug { parse, cache, file, blocks, gaps, limits, files } => commands::debug::run(&config, &mut cache_manager, parse, cache, file, blocks, gaps, limits, files),
+        Commands::Debug { limits } => commands::debug::run(&config, &mut cache_manager, limits),
     }    
     let exec_duration = exec.elapsed();
 

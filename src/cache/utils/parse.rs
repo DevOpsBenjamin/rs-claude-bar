@@ -3,7 +3,7 @@ use chrono::{DateTime, Utc, Timelike};
 
 use crate::{
     cache::{CachedFile, BlockLine, PerHourBlock},
-    claude_types::transcript_entry::{ClaudeEntry, TranscriptEntry},
+    claude_types::transcript_entry::ClaudeEntry,
 };
 
 /// Refresh a single file by parsing JSONL content and populating cache data

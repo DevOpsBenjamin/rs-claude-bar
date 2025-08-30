@@ -1,5 +1,4 @@
-use crate::cache::{load_cache, save_cache, set_file_info, refresh_cache, CacheInfo, CacheStatus};
-use std::fs;
+use crate::cache::{load_cache, save_cache, set_file_info, refresh_cache, CacheInfo};
 
 pub struct CacheManager {
     cache: CacheInfo,
@@ -8,7 +7,7 @@ pub struct CacheManager {
 
 impl CacheManager {
     pub fn new(base_path: &str, no_cache: bool) -> Self {
-        let mut cache = match no_cache {
+        let cache = match no_cache {
             true => CacheInfo::default(),
             false => load_cache(),
         };

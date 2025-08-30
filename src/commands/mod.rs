@@ -10,5 +10,5 @@ pub mod install;
 pub mod prompt;
 pub mod table;
 pub mod update;
-pub mod display_config;
+pub mod display;
 pub mod resets;

@@ -38,7 +38,7 @@ struct FileParseStats {
 
 // Removed tabled struct - using cool custom TableCreator instead!
 
-pub fn run(config: &ConfigInfo, cache_manager: &mut CacheManager, parse: bool, cache: bool, file: Option<String>, blocks: bool, gaps: bool, limits: bool, files: bool) {
+pub fn run(config: &ConfigInfo, cache_manager: &mut CacheManager, limits: bool) {
     let base_path = format!("{}/projects", config.claude_data_path);
     let path = Path::new(&base_path);
 
@@ -47,25 +47,8 @@ pub fn run(config: &ConfigInfo, cache_manager: &mut CacheManager, parse: bool, c
         return;
     }
 
-    if let Some(filepath) = file {
-        run_single_file_debug(cache_manager, &base_path, &filepath);
-    } else if parse {
-        //run_parse_debug(cache_manager, &base_path);
-    } else if limits {
+    if limits {
         run_limits_debug_cache(cache_manager);
-    } else if blocks || gaps {
-        run_blocks_debug(config, cache_manager, gaps, limits);
-    } else if files {
-        run_files_debug(cache_manager, &base_path);
-    } else {
-        // Default behavior - show table view
-        if parse {
-            //run_parse_debug(cache_manager, &base_path); // V1: Now cache-based
-        } else if cache {
-            //run_parse_debug_v2(config, &base_path, no_cache); // V2: New cached system (--no-cache forces full reparse)
-        } else {
-            //run_parse_debug(cache_manager, &base_path); // Default: Now cache-based
-        }
     }
 }
 
