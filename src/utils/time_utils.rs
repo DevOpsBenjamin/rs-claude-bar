@@ -1,4 +1,4 @@
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Utc, Timelike};
 
 /// Find entries within a time window
 pub fn entries_within_window(

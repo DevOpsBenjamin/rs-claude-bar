@@ -42,6 +42,14 @@ fn main() {
         Commands::Debug { parse, cache, file, blocks, gaps, limits, files } => commands::debug::run(&config, &mut cache_manager, parse, cache, file, blocks, gaps, limits, files),
     }    
     let exec_duration = exec.elapsed();
+
+    // Save cache to disk with timing (unless --no-save)
+    let save = std::time::Instant::now();
+    if !cli.no_save {
+        cache_manager.save();
+    }
+    let save_duration = save.elapsed();
+    
     let total_duration = start.elapsed();
 
     //You can alwasy check last cmd duration
@@ -50,12 +58,13 @@ fn main() {
         .join(".claude-bar/last_exec");
 
     let content = format!(
-        "Timestamp: {}\nConfig: {:.1} ms\nCache: {:.1} ms\nFile: {:.1} ms\nExec: {:.1} ms\nTotal: {:.1} ms\n",
+        "Timestamp: {}\nConfig: {:.1} ms\nCache: {:.1} ms\nFile: {:.1} ms\nExec: {:.1} ms\nSave: {:.1} ms\nTotal: {:.1} ms\n",
         Utc::now().to_rfc3339(),
         config_duration.as_secs_f64() * 1000.0,
         cache_duration.as_secs_f64() * 1000.0,
         file_duration.as_secs_f64() * 1000.0,
         exec_duration.as_secs_f64() * 1000.0,
+        save_duration.as_secs_f64() * 1000.0,
         total_duration.as_secs_f64() * 1000.0,
     );
     let _ = fs::write(path, content);

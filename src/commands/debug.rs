@@ -1,10 +1,10 @@
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Utc, Timelike};
 use crate::{
     analyzer::{
         Analyzer
     },
     cache::CacheManager,
-    claude_types::transcript_entry::Entry,
+    claude_types::transcript_entry::{ClaudeEntry, TranscriptEntry},
     commands::shared_types::UsageBlock,
     common::colors::*,
     claudebar_types::{
@@ -50,19 +50,21 @@ pub fn run(config: &ConfigInfo, cache_manager: &mut CacheManager, parse: bool, c
     if let Some(filepath) = file {
         run_single_file_debug(cache_manager, &base_path, &filepath);
     } else if parse {
-        run_parse_debug(cache_manager, &base_path);
-    } else if blocks || gaps || limits {
+        //run_parse_debug(cache_manager, &base_path);
+    } else if limits {
+        run_limits_debug_cache(cache_manager);
+    } else if blocks || gaps {
         run_blocks_debug(config, cache_manager, gaps, limits);
     } else if files {
         run_files_debug(cache_manager, &base_path);
     } else {
         // Default behavior - show table view
         if parse {
-            run_parse_debug(cache_manager, &base_path); // V1: Now cache-based
+            //run_parse_debug(cache_manager, &base_path); // V1: Now cache-based
         } else if cache {
             //run_parse_debug_v2(config, &base_path, no_cache); // V2: New cached system (--no-cache forces full reparse)
         } else {
-            run_parse_debug(cache_manager, &base_path); // Default: Now cache-based
+            //run_parse_debug(cache_manager, &base_path); // Default: Now cache-based
         }
     }
 }
@@ -123,6 +125,7 @@ fn run_parse_debug_v2(config: &ConfigInfo, base_path: &str, no_cache: bool) {
 }
  */
 
+ /*
 fn run_parse_debug(cache_manager: &CacheManager, base_path: &str) {
     println!(
         "{bold}{cyan}🔍 DEBUG: JSONL Parse Analysis (Cache-based){reset}",
@@ -231,13 +234,13 @@ fn parse_file_content(content: &str) -> FileParseStats {
             continue;
         }
 
-        match serde_json::from_str::<Entry>(line) {
-            Ok(entry) => {
+        match serde_json::from_str::<ClaudeEntry>(line) {
+            Ok(ClaudeEntry::Transcript(entry)) => {
                 stats.successful_parses += 1;
                 
                 // Parse timestamp and update bounds if available
-                if let Some(timestamp_str) = entry.timestamp() {
-                    if let Ok(timestamp) = DateTime::parse_from_rfc3339(timestamp_str) {
+                let timestamp_str = &entry.timestamp;
+                if let Ok(timestamp) = DateTime::parse_from_rfc3339(timestamp_str) {
                         let timestamp_utc = timestamp.with_timezone(&Utc);
                         if stats.min_timestamp.is_none() || timestamp_utc < stats.min_timestamp.unwrap() {
                             stats.min_timestamp = Some(timestamp_utc);
@@ -249,7 +252,7 @@ fn parse_file_content(content: &str) -> FileParseStats {
                 }
 
                 // Add output tokens if available
-                if let Some(usage) = entry.usage() {
+                if let Some(usage) = &entry.message.usage {
                     stats.total_output_tokens += usage.output_tokens;
                 }
             }
@@ -261,7 +264,7 @@ fn parse_file_content(content: &str) -> FileParseStats {
 
     stats
 }
-
+*/
 
 fn print_summary(all_file_stats: &[(String, FileParseStats)]) {
     let total_files = all_file_stats.len();
@@ -397,13 +400,13 @@ fn analyze_single_file_with_errors(content: &str, _file_path: &str) {
             continue;
         }
 
-        match serde_json::from_str::<Entry>(line) {
-            Ok(entry) => {
+        match serde_json::from_str::<ClaudeEntry>(line) {
+            Ok(ClaudeEntry::Transcript(entry)) => {
                 stats.successful_parses += 1;
                 
                 // Parse timestamp and update bounds if available
-                if let Some(timestamp_str) = entry.timestamp() {
-                    if let Ok(timestamp) = DateTime::parse_from_rfc3339(timestamp_str) {
+                let timestamp_str = &entry.timestamp;
+                if let Ok(timestamp) = DateTime::parse_from_rfc3339(timestamp_str) {
                         let timestamp_utc = timestamp.with_timezone(&Utc);
                         if stats.min_timestamp.is_none() || timestamp_utc < stats.min_timestamp.unwrap() {
                             stats.min_timestamp = Some(timestamp_utc);
@@ -411,14 +414,17 @@ fn analyze_single_file_with_errors(content: &str, _file_path: &str) {
                         if stats.max_timestamp.is_none() || timestamp_utc > stats.max_timestamp.unwrap() {
                             stats.max_timestamp = Some(timestamp_utc);
                         }
-                    }
+                    
                 }
 
                 // Add output tokens if available
-                if let Some(usage) = entry.usage() {
+                if let Some(usage) = &entry.message.usage {
                     stats.total_output_tokens += usage.output_tokens;
                 }
             }
+            Ok(ClaudeEntry::Summary { .. }) | Ok(ClaudeEntry::Unknown(_)) => {
+                // Skip summary and unknown entries for now
+            },
             Err(parse_error) => {
                 stats.parse_errors += 1;
                 parse_errors.push((line_num + 1, parse_error.to_string(), line.to_string()));
@@ -564,19 +570,182 @@ fn list_available_files_from_cache(cache_manager: &CacheManager) {
 
 
 fn run_blocks_debug(config: &ConfigInfo, cache_manager: &CacheManager, gaps: bool, limits: bool) {
-    // Load entries using cache and implement debug functionality here
-    let base_path = format!("{}/projects", config.claude_data_path);
-    let all_entries = load_usage_entries(cache_manager, &base_path);
-
-    if limits {
-        print_limits_debug(&all_entries);
-    } else if gaps {
-        let blocks = compute_blocks(&all_entries);
-        print_gaps_debug(&blocks);
+    if gaps {
+        run_gaps_debug_cache(cache_manager);
     } else {
-        let blocks = compute_blocks(&all_entries);
-        print_blocks_debug(&blocks, &all_entries);
+        run_blocks_debug_cache(cache_manager);
     }
+}
+
+/// Debug 5-hour blocks using only cache data
+fn run_blocks_debug_cache(cache_manager: &CacheManager) {
+    println!(
+        "{bold}{cyan}🟦 DEBUG: 5-Hour Blocks Analysis (Cache-only){reset}",
+        bold = BOLD,
+        cyan = CYAN,
+        reset = RESET,
+    );
+    println!();
+
+    let cache_info = cache_manager.get_cache();
+    let mut all_per_hour_blocks = Vec::new();
+
+    // Collect all per-hour blocks from all files
+    for (folder_name, cached_folder) in &cache_info.folders {
+        for (file_name, cached_file) in &cached_folder.files {
+            for (hour_start, per_hour_block) in &cached_file.per_hour {
+                all_per_hour_blocks.push((folder_name.as_str(), file_name.as_str(), per_hour_block));
+            }
+        }
+    }
+
+    if all_per_hour_blocks.is_empty() {
+        println!("✅ No hourly usage blocks found in cache");
+        return;
+    }
+
+    // Sort by hour start
+    all_per_hour_blocks.sort_by_key(|(_, _, block)| block.hour_start);
+
+    // Group into 5-hour windows and display
+    let headers = vec![
+        HeaderInfo { label: "🕐 5-Hour Window", width: 15 },
+        HeaderInfo { label: "📊 Total Tokens", width: 12 },
+        HeaderInfo { label: "🤖 Assistant", width: 10 },
+        HeaderInfo { label: "👤 User", width: 8 },
+        HeaderInfo { label: "📝 Entries", width: 8 },
+        HeaderInfo { label: "💬 Content", width: 10 },
+    ];
+    let mut tc = TableCreator::new(headers);
+
+    // Group by 5-hour windows (00:00-05:00, 05:00-10:00, etc.)
+    let mut five_hour_groups = std::collections::HashMap::new();
+    
+    for (folder_name, file_name, block) in &all_per_hour_blocks {
+        let five_hour_start = (block.hour_start.hour() / 5) * 5;
+        let five_hour_key = block.hour_start.with_hour(five_hour_start).unwrap();
+        
+        let group = five_hour_groups.entry(five_hour_key).or_insert_with(|| {
+            (0u32, 0u32, 0u32, 0u32, 0u64) // (total_tokens, assistant_msgs, user_msgs, entries, content_len)
+        });
+        
+        group.0 += block.input_tokens + block.output_tokens + block.cache_creation_tokens + block.cache_read_tokens;
+        group.1 += block.assistant_messages;
+        group.2 += block.user_messages;
+        group.3 += block.entry_count;
+        group.4 += block.total_content_length;
+    }
+
+    // Display sorted 5-hour blocks
+    let mut sorted_groups: Vec<_> = five_hour_groups.iter().collect();
+    sorted_groups.sort_by_key(|(time, _)| *time);
+
+    let groups_count = sorted_groups.len();
+    for (start_time, (total_tokens, assistant_msgs, user_msgs, entries, content_len)) in &sorted_groups {
+        let end_time = **start_time + chrono::Duration::hours(5);
+        let window_str = format!("{}-{}", 
+            start_time.format("%H:%M"), 
+            end_time.format("%H:%M")
+        );
+        
+        tc.add_row(vec![
+            format_text(&window_str, 15),
+            format_number_with_separators(*total_tokens),
+            format_number_with_separators(*assistant_msgs),
+            format_number_with_separators(*user_msgs), 
+            format_number_with_separators(*entries),
+            format_file_size(*content_len),
+        ]);
+    }
+
+    tc.display(false);
+
+    println!();
+    println!(
+        "{bold}📊 Summary: {} 5-hour blocks from {} hourly blocks{reset}",
+        groups_count,
+        all_per_hour_blocks.len(),
+        bold = BOLD,
+        reset = RESET
+    );
+}
+
+/// Debug gaps between usage blocks using cache data  
+fn run_gaps_debug_cache(cache_manager: &CacheManager) {
+    println!(
+        "{bold}{cyan}⛳ DEBUG: Usage Gaps Analysis (Cache-only){reset}",
+        bold = BOLD,
+        cyan = CYAN,
+        reset = RESET,
+    );
+    println!();
+
+    let cache_info = cache_manager.get_cache();
+    let mut all_per_hour_blocks = Vec::new();
+
+    // Collect all per-hour blocks from all files
+    for (_folder_name, cached_folder) in &cache_info.folders {
+        for (_file_name, cached_file) in &cached_folder.files {
+            for (hour_start, per_hour_block) in &cached_file.per_hour {
+                all_per_hour_blocks.push(per_hour_block);
+            }
+        }
+    }
+
+    if all_per_hour_blocks.len() < 2 {
+        println!("✅ Need at least 2 hourly blocks to detect gaps");
+        return;
+    }
+
+    // Sort by hour start
+    all_per_hour_blocks.sort_by_key(|block| block.hour_start);
+
+    // Find gaps between consecutive blocks
+    let mut gaps = Vec::new();
+    for i in 1..all_per_hour_blocks.len() {
+        let prev_block = &all_per_hour_blocks[i-1];
+        let curr_block = &all_per_hour_blocks[i];
+        
+        let expected_next = prev_block.hour_end + chrono::Duration::seconds(1);
+        let gap_duration = curr_block.hour_start - expected_next;
+        
+        if gap_duration > chrono::Duration::hours(1) {
+            gaps.push((prev_block.hour_end, curr_block.hour_start, gap_duration));
+        }
+    }
+
+    if gaps.is_empty() {
+        println!("✅ No significant gaps found between usage blocks");
+        return;
+    }
+
+    // Display gaps
+    let headers = vec![
+        HeaderInfo { label: "🔚 Gap Start", width: 16 },
+        HeaderInfo { label: "🔛 Gap End", width: 16 },
+        HeaderInfo { label: "⏱️ Duration", width: 12 },
+        HeaderInfo { label: "📊 Gap Size", width: 10 },
+    ];
+    let mut tc = TableCreator::new(headers);
+
+    for (gap_start, gap_end, duration) in &gaps {
+        tc.add_row(vec![
+            format_date(*gap_start, 16),
+            format_date(*gap_end, 16),
+            format_duration(*duration, 12),
+            format!("{:.1}h", duration.num_minutes() as f64 / 60.0),
+        ]);
+    }
+
+    tc.display(false);
+
+    println!();
+    println!(
+        "{bold}📊 Found {} gaps in usage timeline{reset}",
+        gaps.len(),
+        bold = BOLD,
+        reset = RESET
+    );
 }
 
 fn load_usage_entries(cache_manager: &CacheManager, base_path: &str) -> Vec<ClaudeBarUsageEntry> {
@@ -594,16 +763,14 @@ fn load_usage_entries(cache_manager: &CacheManager, base_path: &str) -> Vec<Clau
                         continue;
                     }
 
-                    if let Ok(entry_parsed) = serde_json::from_str::<Entry>(line) {
-                        if let Entry::Transcript(transcript) = entry_parsed {
-                            let usage_entry = ClaudeBarUsageEntry::from_transcript(
-                                &transcript,
-                                folder_name.clone(),
-                                file_name.clone(),
-                                file_date,
-                            );
-                            usage_entries.push(usage_entry);
-                        }
+                    if let Ok(transcript) = serde_json::from_str::<TranscriptEntry>(line) {
+                        let usage_entry = ClaudeBarUsageEntry::from_transcript(
+                            &transcript,
+                            folder_name.clone(),
+                            file_name.clone(),
+                            file_date,
+                        );
+                        usage_entries.push(usage_entry);
                     }
                 }
             }
@@ -822,6 +989,86 @@ fn print_gaps_debug(blocks: &[UsageBlock]) {
     );
 }
 
+
+/// Debug limits using only cache data (no filesystem access)
+fn run_limits_debug_cache(cache_manager: &CacheManager) {
+    println!(
+        "{bold}{cyan}🚫 DEBUG: Limits Analysis (Cache-only){reset}",
+        bold = BOLD,
+        cyan = CYAN,
+        reset = RESET,
+    );
+    println!();
+
+    let cache_info = cache_manager.get_cache();
+    let mut all_block_lines = Vec::new();
+
+    // Collect all block lines from all files
+    for (folder_name, cached_folder) in &cache_info.folders {
+        for (file_name, cached_file) in &cached_folder.files {
+            for block_line in &cached_file.blocks {
+                all_block_lines.push((folder_name.as_str(), file_name.as_str(), block_line));
+            }
+        }
+    }
+
+    if all_block_lines.is_empty() {
+        println!("✅ No limit events found in cache");
+        return;
+    }
+
+    // Sort by timestamp
+    all_block_lines.sort_by_key(|(_, _, block)| block.block_timestamp);
+
+    // Calculate dynamic column widths based on cache data
+    let max_folder_width = all_block_lines.iter()
+        .map(|(folder_name, _, _)| folder_name.len())
+        .max()
+        .unwrap_or(10)
+        .max(8); // Minimum width for "📁 Folder" header
+    
+    let max_file_width = all_block_lines.iter()
+        .map(|(_, file_name, _)| file_name.len())
+        .max()
+        .unwrap_or(10)
+        .max(6); // Minimum width for "📄 File" header
+
+    // Display table of limit events with dynamic widths
+    let headers = vec![
+        HeaderInfo { label: "📁 Folder", width: max_folder_width },
+        HeaderInfo { label: "📄 File", width: max_file_width },
+        HeaderInfo { label: "⏰ Block Time", width: 11 },
+        HeaderInfo { label: "🔓 Unlock Time", width: 11 },
+        HeaderInfo { label: "⏱️ Reset", width: 4 },
+    ];
+    let mut tc = TableCreator::new(headers);
+
+    for (folder_name, file_name, block_line) in &all_block_lines {
+        let unlock_time = if let Some(unlock) = &block_line.unlock_timestamp {
+            format_date(*unlock, 11)
+        } else {
+            "Unknown".to_string()
+        };
+
+        tc.add_row(vec![
+            format_text(folder_name, max_folder_width),
+            format_text(file_name, max_file_width),
+            format_date(block_line.block_timestamp, 11),
+            unlock_time,
+            format_text(&block_line.reset_text, 4),
+        ]);
+    }
+
+    tc.display(false);
+
+    println!();
+    println!(
+        "{bold}📊 Summary: {} limit events from cache{reset}",
+        all_block_lines.len(),
+        bold = BOLD,
+        reset = RESET
+    );
+}
 
 fn run_files_debug(cache_manager: &mut CacheManager, base_path: &str) {
     println!(

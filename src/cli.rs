@@ -7,6 +7,10 @@ pub struct Cli {
     #[arg(long, global = true)]
     pub no_cache: bool,
     
+    /// Don't save cache after processing
+    #[arg(long, global = true)]
+    pub no_save: bool,
+    
     #[command(subcommand)]
     pub command: Option<Commands>,
 }

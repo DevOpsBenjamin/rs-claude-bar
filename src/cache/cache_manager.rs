@@ -1,4 +1,4 @@
-use crate::cache::{load_cache, set_file_info, refresh_cache, CacheInfo, CacheStatus};
+use crate::cache::{load_cache, save_cache, set_file_info, refresh_cache, CacheInfo, CacheStatus};
 use std::fs;
 
 pub struct CacheManager {
@@ -24,6 +24,10 @@ impl CacheManager {
 
     pub fn get_cache(&self) -> &CacheInfo {
         &self.cache
+    }
+
+    pub fn save(&self) {
+        save_cache(&self.cache);
     }
 
     /// Refresh all files marked as NeedsRefresh in the cache

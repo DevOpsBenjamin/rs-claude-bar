@@ -1,7 +1,7 @@
 use std::{collections::{HashMap, hash_map::Entry}, fs, path::{Path, PathBuf}};
 use chrono::{DateTime, Utc};
 
-use crate::cache::{CacheInfo, CacheStatus, CachedFile, CachedFolder};
+use crate::cache::{CacheInfo, CacheStatus, CachedFile, CachedFolder,utils::parse::refresh_single_file};
 
 /// Get the path to cache.json in ~/.claude-bar/ directory
 /// Returns default path if home directory not found
@@ -102,8 +102,9 @@ fn scan_folder(cached_folder: &mut CachedFolder, folder_path: &Path) {
                 // New file not in cache - mark as NotInCache
                 entry.insert(CachedFile {
                     file_name,
-                    cache_time:created_time,
-                    data: Vec::new(),
+                    cache_time: created_time,
+                    blocks: Vec::new(),
+                    per_hour: HashMap::new(),
                     cache_status: CacheStatus::NotInCache,
                     modified_time,
                     created_time,
