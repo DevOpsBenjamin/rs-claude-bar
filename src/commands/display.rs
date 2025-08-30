@@ -21,42 +21,99 @@ pub fn run_interactive_config(config: &ConfigInfo) -> Result<(), Box<dyn std::er
     let registry = MetricRegistry::new();
     let mut status_config = load_or_default_status_config(config)?;
     
-    for metric in registry.all_metrics() {
-        configure_metric(&mut status_config, metric)?;
-    }
-    
-    // Configure separator
-    configure_separator(&mut status_config)?;
-    
-    // Preview and save
-    println!("\n{bold}📊 Preview of your status line:{reset}", bold = BOLD, reset = RESET);
-    let preview = generate_status_line_preview(&status_config);
-    println!("   {}", preview);
-    
-    println!();
-    if confirm("💾 Save this configuration? [Y/n]")? {
-        save_status_config(config, &status_config)?;
-        println!("✅ Status line configuration saved!");
-        println!("   Use `rs-claude-bar prompt` to see your customized status line.");
-    } else {
-        println!("❌ Configuration discarded.");
+    loop {
+        show_main_menu(&status_config)?;
+        
+        let choice = get_menu_choice(1, 5)?;
+        
+        match choice {
+            1 => add_item_interactive(&mut status_config, &registry)?,
+            2 => remove_item_interactive(&mut status_config)?,
+            3 => configure_separator(&mut status_config)?,
+            4 => {
+                save_status_config(config, &status_config)?;
+                println!("✅ Status line configuration saved!");
+                println!("   Use `rs-claude-bar prompt` to see your customized status line.");
+                break;
+            },
+            5 => {
+                println!("❌ Configuration discarded.");
+                break;
+            },
+            _ => continue,
+        }
     }
     
     Ok(())
 }
 
-fn configure_metric(
+fn show_main_menu(config: &StatusLineConfig) -> Result<(), Box<dyn std::error::Error>> {
+    // Clear console
+    print!("\x1b[2J\x1b[1;1H");
+    
+    println!("🎨 {bold}{cyan}Configure your Claude Code status line{reset}\n", 
+        bold = BOLD, cyan = CYAN, reset = RESET);
+    
+    println!("{bold}Current Status Line:{reset} {}", 
+        generate_status_line_preview(config),
+        bold = BOLD, 
+        reset = RESET
+    );
+    println!("{bold}Separator:{reset} \"{}\"", config.separator, bold = BOLD, reset = RESET);
+    
+    println!("\n{bold}Main Menu:{reset}", bold = BOLD, reset = RESET);
+    println!("1) 📊 Add Item");
+    println!("2) 🗑️  Remove Item");
+    println!("3) 🔄 Change Separator");
+    println!("4) 💾 Save & Exit");
+    println!("5) ❌ Exit without saving");
+    println!();
+    
+    Ok(())
+}
+
+fn add_item_interactive(
+    config: &mut StatusLineConfig,
+    registry: &MetricRegistry
+) -> Result<(), Box<dyn std::error::Error>> {
+    // Clear console for clean interface
+    print!("\x1b[2J\x1b[1;1H");
+    
+    println!("📊 {bold}Add New Status Item{reset}", bold = BOLD, reset = RESET);
+    
+    // Get all available metrics (allow duplicates with different formats)
+    let available_metrics = registry.all_metrics();
+    
+    println!("\n{bold}Available Items:{reset}", bold = BOLD, reset = RESET);
+    for (i, metric) in available_metrics.iter().enumerate() {
+        let example = generate_format_example_mock(metric.stat_type.clone(), &metric.default_format);
+        println!("{}) {:16} - {}", i + 1, metric.name, example);
+    }
+    
+    println!();
+    let choice = get_menu_choice(0, available_metrics.len())?;
+    
+    if choice == 0 {
+        return Ok(());
+    }
+    
+    let selected_metric = &available_metrics[choice - 1];
+    configure_item_format(config, selected_metric)?;
+    
+    Ok(())
+}
+
+fn configure_item_format(
     config: &mut StatusLineConfig,
     metric: &crate::display::status_config::MetricDefinition
 ) -> Result<(), Box<dyn std::error::Error>> {
-    println!("📊 {bold}{metric_name}{reset}", 
-        bold = BOLD, 
-        metric_name = metric.name, 
-        reset = RESET);
+    // Clear console for clean interface
+    print!("\x1b[2J\x1b[1;1H");
+    
+    println!("📊 {bold}{}{reset}", metric.name, bold = BOLD, reset = RESET);
     println!("   {}", metric.description);
     
-    // Show all supported formats with examples
-    println!("   Available formats:");
+    println!("\n   {bold}Available formats:{reset}", bold = BOLD, reset = RESET);
     for (i, format) in metric.supported_formats.iter().enumerate() {
         let example = generate_format_example_mock(metric.stat_type.clone(), format);
         let is_default = format == &metric.default_format;
@@ -70,47 +127,91 @@ fn configure_metric(
         );
     }
     
-    // Ask user to choose format or skip
-    let choice = get_format_choice(metric)?;
-    
-    if let Some(selected_format) = choice {
-        config.items.push(DisplayItem {
-            stat_type: metric.stat_type.clone(),
-            format: selected_format,
-            enabled: true,
-        });
-        
-        //let example = generate_format_example_mock(metric.stat_type.clone(), &selected_format);
-        println!("   ✅ Added: {}", "TOTO");
-    } else {
-        println!("   ⏭️  Skipped");
-    }
-    
     println!();
+    let choice = get_menu_choice(1, metric.supported_formats.len())?;
+    let selected_format = metric.supported_formats[choice - 1].clone();
+    
+    config.items.push(DisplayItem {
+        stat_type: metric.stat_type.clone(),
+        format: selected_format.clone(),
+        enabled: true,
+    });
+    
+    
     Ok(())
 }
 
+fn remove_item_interactive(config: &mut StatusLineConfig) -> Result<(), Box<dyn std::error::Error>> {
+    // Clear console for clean interface
+    print!("\x1b[2J\x1b[1;1H");
+    
+    if config.items.is_empty() {
+        return Ok(());
+    }
+    
+    println!("🗑️  {bold}Remove Status Item{reset}", bold = BOLD, reset = RESET);
+    println!("\n{bold}Current Items:{reset}", bold = BOLD, reset = RESET);
+    
+    for (i, item) in config.items.iter().enumerate() {
+        let example = generate_format_example_mock(item.stat_type.clone(), &item.format);
+        println!("{}) {}", i + 1, example);
+    }
+    
+    println!();
+    let choice = get_menu_choice(0, config.items.len())?;
+    
+    if choice == 0 {
+        return Ok(());
+    }
+    
+    config.items.remove(choice - 1);
+    
+    Ok(())
+}
+
+
+fn get_menu_choice(min: usize, max: usize) -> Result<usize, Box<dyn std::error::Error>> {
+    loop {
+        print!("Choice [{}-{}]: ", min, max);
+        io::stdout().flush()?;
+        
+        let mut input = String::new();
+        match io::stdin().read_line(&mut input) {
+            Ok(0) => return Err("EOF reached".into()), // No input available
+            Ok(_) => {
+                let input = input.trim();
+                if let Ok(choice) = input.parse::<usize>() {
+                    if choice >= min && choice <= max {
+                        return Ok(choice);
+                    }
+                }
+                println!("   Invalid choice, try again.");
+            }
+            Err(e) => return Err(e.into()),
+        }
+    }
+}
+
 fn configure_separator(config: &mut StatusLineConfig) -> Result<(), Box<dyn std::error::Error>> {
-    println!("🔗 {bold}Separator{reset}", bold = BOLD, reset = RESET);
-    println!("   Choose what goes between each item:");
+    // Clear console for clean interface
+    print!("\x1b[2J\x1b[1;1H");
+    
+    println!("🔗 {bold}Change Separator{reset}", bold = BOLD, reset = RESET);
+    println!("\n   Choose what goes between each item:");
     println!("   1) \" | \"     (default)");
     println!("   2) \" • \"");
     println!("   3) \" · \"");
     println!("   4) \" → \"");
     println!("   5) Custom");
     
-    print!("   Choice [1-5]: ");
-    io::stdout().flush()?;
+    println!();
+    let choice = get_menu_choice(1, 5)?;
     
-    let mut input = String::new();
-    io::stdin().read_line(&mut input)?;
-    let input = input.trim();
-    
-    config.separator = match input {
-        "2" => " • ".to_string(),
-        "3" => " · ".to_string(), 
-        "4" => " → ".to_string(),
-        "5" => {
+    config.separator = match choice {
+        2 => " • ".to_string(),
+        3 => " · ".to_string(), 
+        4 => " → ".to_string(),
+        5 => {
             print!("   Enter custom separator: ");
             io::stdout().flush()?;
             let mut custom = String::new();
@@ -120,48 +221,10 @@ fn configure_separator(config: &mut StatusLineConfig) -> Result<(), Box<dyn std:
         _ => " | ".to_string(),
     };
     
-    println!("   ✅ Separator: \"{}\"", config.separator);
-    println!();
+    
     Ok(())
 }
 
-fn get_format_choice(metric: &crate::display::status_config::MetricDefinition) -> Result<Option<crate::display::status_config::DisplayFormat>, Box<dyn std::error::Error>> {
-    let default_choice = if metric.enabled_by_default {
-        metric.supported_formats.iter()
-            .position(|f| f == &metric.default_format)
-            .map(|i| i + 1)
-            .unwrap_or(1)
-    } else {
-        0 // Skip by default
-    };
-    
-    let prompt = if metric.enabled_by_default {
-        format!("   Choice [1-{}, or 0 to skip]: ", metric.supported_formats.len())
-    } else {
-        format!("   Choice [1-{}, or 0 to skip] (0=default): ", metric.supported_formats.len())
-    };
-    
-    print!("{}", prompt);
-    io::stdout().flush()?;
-    
-    let mut input = String::new();
-    io::stdin().read_line(&mut input)?;
-    let input = input.trim();
-    
-    let choice: usize = if input.is_empty() {
-        default_choice
-    } else {
-        input.parse().unwrap_or(default_choice)
-    };
-    
-    if choice == 0 {
-        Ok(None)
-    } else if choice <= metric.supported_formats.len() {
-        Ok(Some(metric.supported_formats[choice - 1].clone()))
-    } else {
-        Ok(Some(metric.default_format.clone()))
-    }
-}
 
 fn format_name(format: &crate::display::status_config::DisplayFormat) -> &'static str {
     use crate::display::status_config::DisplayFormat;
