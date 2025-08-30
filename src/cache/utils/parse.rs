@@ -23,15 +23,17 @@ pub fn refresh_single_file(file: &mut CachedFile, file_path: &PathBuf) {
     
     // Process entries into per-hour blocks and limit events
     let new_per_hour_blocks = generate_per_hour_blocks(&new_entries);
-    let mut new_block_lines = generate_block_lines(&new_entries);
+    let new_block_lines = generate_block_lines(&new_entries);
     
     // Merge per-hour blocks (replace existing hours with new data)
     for (hour_start, new_block) in new_per_hour_blocks {
         file.per_hour.insert(hour_start, new_block); // Replace if exists
     }
     
-    // Append new block lines (limits are additive)
-    file.blocks.append(&mut new_block_lines);
+    // Merge/replace block lines by timestamp to avoid duplicates
+    for (ts, block) in new_block_lines {
+        file.blocks.insert(ts, block);
+    }
     
     // Update cache timestamp to current time
     file.cache_time = Utc::now();
@@ -157,8 +159,8 @@ fn generate_per_hour_blocks(entries: &[ClaudeEntry]) -> HashMap<DateTime<Utc>, P
 }
 
 /// Generate block/limit events from ClaudeEntry list
-fn generate_block_lines(entries: &[ClaudeEntry]) -> Vec<BlockLine> {
-    let mut block_lines = Vec::new();
+fn generate_block_lines(entries: &[ClaudeEntry]) -> HashMap<DateTime<Utc>, BlockLine> {
+    let mut block_lines: HashMap<DateTime<Utc>, BlockLine> = HashMap::new();
     
     for entry in entries {
         match entry {
@@ -186,19 +188,19 @@ fn generate_block_lines(entries: &[ClaudeEntry]) -> Vec<BlockLine> {
                     let reset_text = extract_reset_time_text(&full_text);
                     let unlock_timestamp = calculate_unlock_time(block_timestamp_utc, &reset_text);
                     
-                    block_lines.push(BlockLine {
-                        block_timestamp: block_timestamp_utc,
-                        unlock_timestamp,
-                        reset_text,
-                    });
+                    block_lines.insert(
+                        block_timestamp_utc,
+                        BlockLine {
+                            unlock_timestamp,
+                            reset_text,
+                        }
+                    );
                 }
             },
             // Summary and Unknown entries are kept for debug parsing stats but don't contain limits
             _ => {} // Skip Summary/Unknown entries - they don't contain limit events
         }
     }
-    
-    block_lines.sort_by_key(|block| block.block_timestamp);
     block_lines
 }
 

@@ -103,7 +103,7 @@ fn scan_folder(cached_folder: &mut CachedFolder, folder_path: &Path) {
                 entry.insert(CachedFile {
                     file_name,
                     cache_time: created_time,
-                    blocks: Vec::new(),
+                    blocks: HashMap::new(),
                     per_hour: HashMap::new(),
                     cache_status: CacheStatus::NotInCache,
                     modified_time,

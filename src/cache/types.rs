@@ -22,8 +22,8 @@ pub struct CachedFolder {
 pub struct CachedFile {
     pub file_name: String,
     pub cache_time: DateTime<Utc>,   //Use as cache date
-    /// List of limit/unlock events (BlockLines)
-    pub blocks: Vec<BlockLine>,
+    /// Map of limit/unlock events keyed by block timestamp
+    pub blocks: HashMap<DateTime<Utc>, BlockLine>,
     /// Map of hourly usage summaries (hour_start -> PerHourBlock) for O(1) lookup
     pub per_hour: HashMap<DateTime<Utc>, PerHourBlock>,
     #[serde(skip)]
@@ -39,8 +39,6 @@ pub struct CachedFile {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BlockLine {
-    /// Timestamp when the limit/block occurred
-    pub block_timestamp: DateTime<Utc>,
     /// Timestamp when the block was lifted/reset (if available)
     pub unlock_timestamp: Option<DateTime<Utc>>,
     /// Human-readable reset time (e.g. "5pm", "2h30m")

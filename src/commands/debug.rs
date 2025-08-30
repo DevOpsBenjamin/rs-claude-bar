@@ -1003,11 +1003,11 @@ fn run_limits_debug_cache(cache_manager: &CacheManager) {
     let cache_info = cache_manager.get_cache();
     let mut all_block_lines = Vec::new();
 
-    // Collect all block lines from all files
+    // Collect all block lines from all files (now stored in a HashMap keyed by timestamp)
     for (folder_name, cached_folder) in &cache_info.folders {
         for (file_name, cached_file) in &cached_folder.files {
-            for block_line in &cached_file.blocks {
-                all_block_lines.push((folder_name.as_str(), file_name.as_str(), block_line));
+            for (ts, block_line) in &cached_file.blocks {
+                all_block_lines.push((folder_name.as_str(), file_name.as_str(), ts.clone(), block_line));
             }
         }
     }
@@ -1018,17 +1018,17 @@ fn run_limits_debug_cache(cache_manager: &CacheManager) {
     }
 
     // Sort by timestamp
-    all_block_lines.sort_by_key(|(_, _, block)| block.block_timestamp);
+    all_block_lines.sort_by_key(|(_, _, ts, _)| ts.clone());
 
     // Calculate dynamic column widths based on cache data
     let max_folder_width = all_block_lines.iter()
-        .map(|(folder_name, _, _)| folder_name.len())
+        .map(|(folder_name, _, _, _)| folder_name.len())
         .max()
         .unwrap_or(10)
         .max(8); // Minimum width for "📁 Folder" header
     
     let max_file_width = all_block_lines.iter()
-        .map(|(_, file_name, _)| file_name.len())
+        .map(|(_, file_name, _, _)| file_name.len())
         .max()
         .unwrap_or(10)
         .max(6); // Minimum width for "📄 File" header
@@ -1043,7 +1043,7 @@ fn run_limits_debug_cache(cache_manager: &CacheManager) {
     ];
     let mut tc = TableCreator::new(headers);
 
-    for (folder_name, file_name, block_line) in &all_block_lines {
+    for (folder_name, file_name, ts, block_line) in &all_block_lines {
         let unlock_time = if let Some(unlock) = &block_line.unlock_timestamp {
             format_date(*unlock, 11)
         } else {
@@ -1053,7 +1053,7 @@ fn run_limits_debug_cache(cache_manager: &CacheManager) {
         tc.add_row(vec![
             format_text(folder_name, max_folder_width),
             format_text(file_name, max_file_width),
-            format_date(block_line.block_timestamp, 11),
+            format_date(*ts, 11),
             unlock_time,
             format_text(&block_line.reset_text, 4),
         ]);
@@ -1117,7 +1117,7 @@ fn run_files_debug(cache_manager: &mut CacheManager, base_path: &str) {
         let headers = vec![
             HeaderInfo::new("File Name", 48),
             HeaderInfo::new("Size", 9),
-            HeaderInfo::new("Modified", 19)
+            HeaderInfo::new("Modified", 19),
             HeaderInfo::new("Created", 19),
             HeaderInfo::new("Cache", 10),
         ];
