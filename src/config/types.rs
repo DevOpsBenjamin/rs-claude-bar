@@ -58,24 +58,16 @@ pub struct DisplayItem {
 pub enum StatType {
     // Token metrics
     TokenUsage,
-    TokenProgress,     // Requires limit block context
-    TokenRemaining,    // Requires limit block context
-    
+    TokenProgress,     // Requires limit block context    
     // Time metrics  
     TimeElapsed,
-    TimeRemaining,
-    SessionDuration,
-    
+    TimeRemaining,    
     // Block/Status metrics
-    BlockStatus,
-    BlockType,         // Limit vs Gap vs Current
-    
+    BlockStatus,    
     // Message metrics
-    MessageCount,
-    
+    MessageCount,    
     // Model info
-    Model,
-    
+    Model,    
     // Activity indicators
     ActivityStatus,    // Active/Idle/Limited
 }

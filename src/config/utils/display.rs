@@ -15,8 +15,8 @@ use crate::{
     display::prompt::{
         PromptData,
         generate_status_line,
-        generate_stat_with_format, 
-    }
+    },
+    display::generate_stat_with_format, 
 };
 
 pub fn run_display_config(config_manager: &mut ConfigManager, data: &PromptData) {

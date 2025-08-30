@@ -115,19 +115,6 @@ impl MetricRegistry {
             enabled_by_default: false,
         });
         
-        metrics.insert(StatType::TokenRemaining, MetricDefinition {
-            stat_type: StatType::TokenRemaining,
-            name: "Tokens Remaining".to_string(),
-            description: "Tokens left before hitting limit".to_string(),
-            supported_formats: vec![
-                DisplayFormat::Text,
-                DisplayFormat::TextWithEmoji,
-                DisplayFormat::Compact,
-            ],
-            default_format: DisplayFormat::TextWithEmoji,
-            enabled_by_default: false,
-        });
-        
         metrics.insert(StatType::ActivityStatus, MetricDefinition {
             stat_type: StatType::ActivityStatus,
             name: "Activity Status".to_string(),

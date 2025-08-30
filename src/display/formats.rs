@@ -1,143 +1,123 @@
-use crate::common::colors::{RED, YELLOW, GREEN, RESET, BOLD};
-/*
-/// Format a token count based on display format
-pub fn format_tokens(count: i64, max_tokens: Option<i64>, format: &DisplayFormat) -> String {
-    match format {
-        DisplayFormat::Text => {
-            format!("{} tokens", format_number(count))
-        }
-        DisplayFormat::TextWithEmoji => {
-            let emoji_str = DisplayItem::default_emoji(&StatType::TokenUsage).unwrap();
-            format!("{} {}", emoji_str, format_number(count))
-        }
-        DisplayFormat::Compact => {
-            format_number_compact(count)
-        }
+use crate::{common::colors::{BOLD, GREEN, RED, RESET}, config::{DisplayFormat, StatType}, display::prompt::PromptData};
+
+
+/// Generate a realistic example using data data
+pub fn generate_stat_with_format(data: &PromptData, stat_type: &StatType, display: &DisplayFormat) -> String {
+       
+    match stat_type {
+        StatType::TokenUsage => generate_token_with_format(data, display),
+        StatType::TokenProgress => generate_progress_with_format(data, display),
+        StatType::TimeElapsed => generate_elapsed_with_format(data, display),
+        StatType::TimeRemaining => generate_remaining_with_format(data, display),
+        StatType::MessageCount => generate_message_with_format(data, display),
+        StatType::Model => generate_model_with_format(data, display),
+        StatType::BlockStatus => generate_status_with_format(data, display),       
+
+        /*
+        (StatType::ActivityStatus, DisplayFormat::StatusIcon) => {
+            if data.is_limited { "🚫" }
+            else if data.progress_percent > 80.0 { "⚡" }
+            else { "🧠" }
+        }.to_string(),
+        (StatType::ActivityStatus, DisplayFormat::StatusText) => {
+            if data.is_limited { "LIMITED" }
+            else if data.progress_percent > 80.0 { "BUSY" }
+            else { "ACTIVE" }
+        }.to_string(),
+        
+        */        
+        // Fallbacks
+        _ => "Example".to_string(),
+    }
+}
+
+
+fn generate_token_with_format(data: &PromptData, display: &DisplayFormat) -> String  {
+    match display {
+        DisplayFormat::TextWithEmoji => format!("🧠 {}", format_number(data.tokens_used)),
+        DisplayFormat::Compact => format_number_compact(data.tokens_used),
+        DisplayFormat::Ratio => format!("{}/{}", 
+            format_number_compact(data.tokens_used), 
+            format_number_compact(data.tokens_limit)),
+        _ => format!("{} tokens", format_number(data.tokens_used)),
+    }
+}
+
+fn generate_progress_with_format(data: &PromptData, display: &DisplayFormat) -> String  {
+    match display {        
+        // Token Progress Examples  
         DisplayFormat::ProgressBar => {
-            if let Some(max) = max_tokens {
-                let percentage = (count as f64 / max as f64 * 100.0) as u8;
-                format_progress_bar(percentage, Some(format_number(count)))
-            } else {
-                format!("{} tokens", format_number(count))
-            }
-        }
-        DisplayFormat::PercentageOnly => {
-            if let Some(max) = max_tokens {
-                let percentage = (count as f64 / max as f64 * 100.0) as u8;
-                format!("{}%", percentage)
-            } else {
-                "N/A".to_string()
-            }
-        }
-        _ => format_number(count),
+            let filled = (data.progress_percent / 10.0) as usize;
+            let empty = 10 - filled;
+            format!("[{}{}] {:.1}%", 
+                "█".repeat(filled), 
+                "░".repeat(empty), 
+                data.progress_percent)
+        },
+        DisplayFormat::StatusColored => {
+            if data.progress_percent < 50.0 { "🟢 Good" }
+            else if data.progress_percent < 80.0 { "🟡 Near Limit" }
+            else { "🔴 Close to Limit" }
+        }.to_string(),
+        _ =>  format!("{:.1}%", data.progress_percent),
     }
 }
 
-/// Format a percentage based on display format
-pub fn format_percentage(percentage: u8, format: &DisplayFormat) -> String {
-    match format {
-        DisplayFormat::Text => {
-            format!("{}%", percentage)
-        }
-        DisplayFormat::TextWithEmoji => {
-            let emoji_str = DisplayItem::default_emoji(&StatType::TokenUsage).unwrap();
-            let color = percentage_color(percentage);
-            format!("{} {}{}%{}", emoji_str, color, percentage, RESET)
-        }
-        DisplayFormat::ProgressBar => {
-            format_progress_bar(percentage, None)
-        }
-        DisplayFormat::PercentageOnly => {
-            format!("{}%", percentage)
-        }
-        DisplayFormat::Compact => {
-            format!("{}%", percentage)
-        }
-        _ => format!("{}%", percentage),
+fn generate_elapsed_with_format(data: &PromptData, display: &DisplayFormat) -> String  {
+    match display {
+        DisplayFormat::Duration => format!("{}h {:02}m", data.time_elapsed_hours, data.time_elapsed_minutes),
+        DisplayFormat::DurationShort => format!("{}h{:02}m", data.time_elapsed_hours, data.time_elapsed_minutes),
+        _ => format!("elapsed {}h {:02}m", data.time_elapsed_hours, data.time_elapsed_minutes),
     }
 }
 
-/// Format a token ratio (current/max) based on display format  
-pub fn format_message_count(count: u32, format: &DisplayFormat) -> String {
-    match format {
-        DisplayFormat::TextWithEmoji => {
-            let emoji_str = DisplayItem::default_emoji(&StatType::MessageCount).unwrap();
-            format!("{} {}", emoji_str, format_number_compact(count.into()))
-        }
-        _ => format_number_compact(count.into()),
+fn generate_remaining_with_format(data: &PromptData, display: &DisplayFormat) -> String  {
+    match display {
+        DisplayFormat::Duration => format!("{}h {:02}m left", data.time_remaining_hours, data.time_remaining_minutes),
+        DisplayFormat::DurationShort => format!("{}h{:02}m", data.time_remaining_hours, data.time_remaining_minutes),
+        _ => format!("{}h {:02}m remaining", data.time_remaining_hours, data.time_remaining_minutes),
     }
 }
 
-/// Format a duration based on display format
-pub fn format_duration_display(duration: Duration, format: &DisplayFormat) -> String {
-    let duration_str = format_duration_human(duration);
-    
-    match format {
-        DisplayFormat::Text => duration_str,
-        DisplayFormat::TextWithEmoji => {
-            let emoji_str = DisplayItem::default_emoji(&StatType::TimeElapsed).unwrap();
-            format!("{} {}", emoji_str, duration_str)
-        }
-        DisplayFormat::Compact => {
-            format_duration_compact(duration)
-        }
-        DisplayFormat::Duration => duration_str,
-        _ => duration_str,
+fn generate_message_with_format(data: &PromptData, display: &DisplayFormat) -> String  {
+    match display {
+        DisplayFormat::TextWithEmoji => format!("💬 {}", data.message_count),
+        DisplayFormat::Compact => format!("{}", data.message_count),
+        _ => format!("{} messages", data.message_count),
     }
 }
-
-/// Format model name based on display format
-pub fn format_model(model: &str, format: &DisplayFormat) -> String {
-    match format {
-        DisplayFormat::Text => model.to_string(),
-        DisplayFormat::TextWithEmoji => {
-            let emoji_str = DisplayItem::default_emoji(&StatType::Model).unwrap();
-            format!("{} {}", emoji_str, model)
-        }
-        DisplayFormat::Compact => {
-            // Just use first 3 chars for compact
-            model.chars().take(3).collect()
-        }
-        _ => model.to_string(),
-    }
-}
-
-/// Format block status based on current state
-pub fn format_block_status(
-    status: &crate::analyzer::BlockStatus, 
-    format: &DisplayFormat,
-    remaining_time: Option<Duration>
-) -> String {
-    match format {
+        
+fn generate_status_with_format(data: &PromptData, display: &DisplayFormat) -> String  {
+    match display {
         DisplayFormat::StatusIcon => {
-            match status {
-                crate::analyzer::BlockStatus::InCurrentBlock => "🟢".to_string(),
-                crate::analyzer::BlockStatus::NeedNewBlock | 
-                crate::analyzer::BlockStatus::BeforeCurrentBlock => "🔴".to_string(),
-                crate::analyzer::BlockStatus::NoCurrentBlock => "🟡".to_string(),
+            if data.is_limited { "🚫" } else { "🟢" }
+        }.to_string(),
+        DisplayFormat::StatusText => data.block_status.clone(),
+        _ => {
+            if data.is_limited { 
+                format!("{red}{bold}{}{reset}", data.block_status, red = RED, bold = BOLD, reset = RESET)
+            } else { 
+                format!("{green}{bold}{}{reset}", data.block_status, green = GREEN, bold = BOLD, reset = RESET)
             }
-        }
-        DisplayFormat::Text => {
-            match status {
-                crate::analyzer::BlockStatus::InCurrentBlock => {
-                    if let Some(remaining) = remaining_time {
-                        format!("ACTIVE ({})", format_duration_human(remaining))
-                    } else {
-                        "ACTIVE".to_string()
-                    }
-                }
-                crate::analyzer::BlockStatus::NeedNewBlock => "LIMIT REACHED".to_string(),
-                crate::analyzer::BlockStatus::BeforeCurrentBlock => "LIMIT".to_string(),
-                crate::analyzer::BlockStatus::NoCurrentBlock => "NO BLOCK".to_string(),
-            }
-        }
-        _ => format_block_status(status, &DisplayFormat::Text, remaining_time),
-    }
+        },
+    }        
 }
 
-// Helper functions
+fn generate_model_with_format(data: &PromptData, display: &DisplayFormat) -> String  {
+    match display {
+        _ => format!("🤖 {}", data.model_name)
+    }       
+}  
 
 fn format_number(num: i64) -> String {
+    if num >= 1000 {
+        format!("{}", num)
+    } else {
+        format!("{}", num)
+    }
+}
+
+fn format_number_compact(num: i64) -> String {
     if num >= 1_000_000 {
         format!("{:.1}M", num as f64 / 1_000_000.0)
     } else if num >= 1_000 {
@@ -146,67 +126,3 @@ fn format_number(num: i64) -> String {
         format!("{}", num)
     }
 }
-
-fn format_number_compact(num: i64) -> String {
-    if num >= 1_000_000 {
-        format!("{:.0}M", num as f64 / 1_000_000.0)
-    } else if num >= 1_000 {
-        format!("{:.0}K", num as f64 / 1_000.0)
-    } else {
-        format!("{}", num)
-    }
-}
-
-fn format_duration_human(duration: Duration) -> String {
-    let hours = duration.num_hours();
-    let minutes = (duration.num_minutes() % 60).abs();
-    
-    if hours > 0 {
-        format!("{}h {}m", hours, minutes)
-    } else {
-        format!("{}m", minutes)
-    }
-}
-
-fn format_duration_compact(duration: Duration) -> String {
-    let hours = duration.num_hours();
-    let minutes = (duration.num_minutes() % 60).abs();
-    
-    if hours > 0 {
-        format!("{}h", hours)
-    } else {
-        format!("{}m", minutes)
-    }
-}
-
-fn format_progress_bar(percentage: u8, label: Option<String>) -> String {
-    let width = 10;
-    let filled = (percentage as f64 / 100.0 * width as f64) as usize;
-    let empty = width - filled;
-    
-    let color = percentage_color(percentage);
-    let bar = format!("{}[{}{}{}{}]{}",
-        color,
-        BOLD,
-        "█".repeat(filled),
-        "░".repeat(empty),
-        RESET,
-        color
-    );
-    
-    if let Some(label) = label {
-        format!("{} {} {}%{}", bar, label, percentage, RESET)
-    } else {
-        format!("{} {}%{}", bar, percentage, RESET)
-    }
-}
-
-fn percentage_color(percentage: u8) -> &'static str {
-    match percentage {
-        0..=49 => GREEN,
-        50..=79 => YELLOW,
-        _ => RED,
-    }
-}
-
-*/

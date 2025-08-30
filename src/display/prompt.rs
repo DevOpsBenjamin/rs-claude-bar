@@ -1,10 +1,10 @@
-
-use crate::{claude_types::input::ClaudeCodeInput, config::StatusLineConfig};
 use std::io::{self, Read};
 
 use crate::{
-    analyze::{Analyzer},
-    config::{DisplayFormat, StatType}
+    claude_types::input::ClaudeCodeInput, 
+    config::StatusLineConfig, 
+    display::generate_stat_with_format,
+    analyze::{Analyzer}
 };
 
 
@@ -63,11 +63,6 @@ impl Default for PromptData {
             is_limited: false,
         }
     }
-}
-
-/// Generate a realistic example using mock data
-pub fn generate_stat_with_format(_data: &PromptData, _stat_type: &StatType, _format: &DisplayFormat) -> String {
-    return "TOTO".to_string();
 }
 
 pub fn parse_claude_input() -> Option<ClaudeCodeInput> {
