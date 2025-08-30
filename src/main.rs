@@ -30,7 +30,7 @@ fn main() {
 
     let analyze =  std::time::Instant::now();
     let mut analyzer = Analyzer::new(cache_manager.get_cache());
-    let analyze_duration = file.elapsed();
+    let analyze_duration = analyze.elapsed();
 
     let exec = std::time::Instant::now();
     // Execute the command  
