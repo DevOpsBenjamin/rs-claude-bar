@@ -38,7 +38,7 @@ fn main() {
         Commands::Info => commands::info::run(&config),
         Commands::Install => commands::install::run(&config),
         Commands::Help => commands::help::run(&config),
-        Commands::Prompt => commands::prompt::run(&config),
+        Commands::Prompt => commands::prompt::run(&config, &analyzer),
         Commands::Display => commands::display::run(&config),
         Commands::Config { command } => commands::config::run(command, &config),
         Commands::Blocks => commands::blocks::run(&config, &analyzer),

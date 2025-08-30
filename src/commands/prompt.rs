@@ -1,140 +1,132 @@
-use std::path::Path;
-use chrono::{Utc, Duration};
-
 use crate::{
-    analyzer::{
-        detect_block_status,
-        BlockStatus,
-        load_entries_since
-    },
+    analyze::{Analyzer, BlockKind},
     common::input::parse_claude_input,
-    config_manager::{
-        load_stats, 
-        save_stats
-    },
-    status::generate_status_with_config_and_model,
-    claudebar_types::{
-        config::{
-            StatsFile,
-            ConfigInfo,
-            SimpleBlock
-        },
-        usage_entry::{ 
-            ClaudeBarUsageEntry, 
-            UserRole
-        }
-    }
+    claudebar_types::config::ConfigInfo,
+    common::colors::*,
 };
+use chrono::{DateTime, Utc};
 
-pub fn run(config: &ConfigInfo) {
-    // Check if stats need refreshing (older than 5 seconds)  
-    let stats = load_stats();
-    let now = chrono::Utc::now();
-    let should_refresh = stats.last_processed
-        .map(|last| now.signed_duration_since(last).num_seconds() > 5)
-        .unwrap_or(true);
-    
-    // TODO: Auto-refresh disabled due to double-counting bug
-    // Need to implement proper incremental updates
-    if false && should_refresh {
-        // Run the resets logic silently (same as resets command but no output)
-        let _ = super::resets::refresh_stats_for_status(config);
-    }
-    
+pub fn run(_config: &ConfigInfo, analyzer: &Analyzer) {
     // Try to get Claude Code input for model info
     let model_name = parse_claude_input()
-        .map(|input| input.model.display_name);
+        .map(|input| input.model.display_name)
+        .unwrap_or_else(|| "Claude".to_string());
     
-    match generate_status_with_config_and_model(config, model_name) {
+    match generate_status(analyzer, &model_name) {
         Ok(status) => print!("{}", status),
         Err(err) => eprintln!("Error generating status: {}", err),
     }
 }
 
-/// Refresh stats silently (no output) if needed
-fn refresh_stats_silently(config: &ConfigInfo) -> Result<(), Box<dyn std::error::Error>> {   
-    let base_path = format!("{}/projects", config.claude_data_path);
-    let path = Path::new(&base_path);
-    if !path.exists() {
-        return Ok(());
-    }
-    
-    let mut stats = load_stats();
+fn generate_status(analyzer: &Analyzer, model_name: &str) -> Result<String, Box<dyn std::error::Error>> {
     let now = Utc::now();
     
-    // Load new entries since last processed
-    let since_time = stats.last_processed.unwrap_or_else(|| now - Duration::days(7));
-    let all_entries = load_entries_since(&base_path, Some(since_time));
+    // Get current active block (either limit or gap)
+    let current_block = analyzer.find_current_block(now);
     
-    if !all_entries.is_empty() {
-        // Update stats with new data
-        update_stats_with_blocks(&mut stats, now);
-        
-        // Update token counts
-        update_block_tokens(&mut stats, &all_entries);
-        
-        save_stats(&stats)?;
-    }
-    
-    Ok(())
-}
-
-// Helper functions (simplified from resets command)
-fn update_stats_with_blocks(
-    stats: &mut StatsFile,
-    now: chrono::DateTime<chrono::Utc>
-) {   
-    let block_status = detect_block_status(now, &stats.current);
-    
-    // Simple logic: if no current block, create one starting now
-    if matches!(block_status, BlockStatus::NoCurrentBlock) {
-        let current_start = round_to_hour_boundary(now);
-        let current_end = current_start + chrono::Duration::hours(5);
-        stats.current = Some(SimpleBlock {
-            start: current_start,
-            end: current_end,
-            tokens: 0,
-        });
-    }
-    
-    stats.last_processed = Some(now);
-}
-
-fn update_block_tokens(stats: &mut StatsFile, entries: &[ClaudeBarUsageEntry]) {
-    use UserRole;
-    
-    // Use same additive logic as resets command
-    for entry in entries {
-        if !matches!(entry.role, UserRole::Assistant) {
-            continue;
-        }
-        
-        let tokens = entry.usage.output_tokens as i64;
-        let timestamp = entry.timestamp;
-        
-        // Check if entry belongs to current block
-        if let Some(current) = &mut stats.current {
-            if timestamp >= current.start && timestamp <= current.end {
-                current.tokens += tokens;
-                continue;
+    match current_block {
+        Some(block) => {
+            let progress = calculate_progress(&block, now);
+            let time_info = format_time_info(&block, now);
+            let token_info = format_token_info(&block);
+            
+            match block.kind {
+                BlockKind::Limit => {
+                    // In a limit block - show progress toward limit
+                    Ok(format!(
+                        "🚫 {token_info} {progress} | {time_info} | 🤖 {model_name}",
+                        token_info = token_info,
+                        progress = progress,
+                        time_info = time_info,
+                        model_name = model_name
+                    ))
+                },
+                BlockKind::Gap => {
+                    // In a gap block - show normal usage
+                    Ok(format!(
+                        "🧠 {token_info} {progress} | {time_info} | 🤖 {model_name}",
+                        token_info = token_info,
+                        progress = progress,  
+                        time_info = time_info,
+                        model_name = model_name
+                    ))
+                },
+                BlockKind::Current => {
+                    // Current/active block - show as active session
+                    Ok(format!(
+                        "⚡ {token_info} {progress} | {time_info} | 🤖 {model_name}",
+                        token_info = token_info,
+                        progress = progress,
+                        time_info = time_info,
+                        model_name = model_name
+                    ))
+                }
             }
-        }
-        
-        // Check if entry belongs to any past block
-        for past_block in &mut stats.past {
-            if timestamp >= past_block.start && timestamp <= past_block.end {
-                past_block.tokens += tokens;
-                break;
-            }
+        },
+        None => {
+            // No current block - probably no recent activity
+            Ok(format!("💤 No recent activity | 🤖 {}", model_name))
         }
     }
 }
 
-fn round_to_hour_boundary(dt: chrono::DateTime<chrono::Utc>) -> chrono::DateTime<chrono::Utc> {
-    use chrono::Timelike;
-    dt.date_naive()
-        .and_hms_opt(dt.hour(), 0, 0)
-        .unwrap()
-        .and_utc()
+fn calculate_progress(block: &crate::analyze::DataBlock, now: DateTime<Utc>) -> String {
+    let total_duration = block.end.signed_duration_since(block.start);
+    let elapsed_duration = now.signed_duration_since(block.start);
+    
+    if total_duration.num_seconds() == 0 {
+        return "0%".to_string();
+    }
+    
+    let progress_pct = (elapsed_duration.num_seconds() as f64 / total_duration.num_seconds() as f64 * 100.0).min(100.0).max(0.0);
+    
+    let color = match progress_pct {
+        p if p < 50.0 => GREEN,
+        p if p < 80.0 => YELLOW, 
+        _ => RED,
+    };
+    
+    format!("{}({:.1}%){}", color, progress_pct, RESET)
 }
 
+fn format_time_info(block: &crate::analyze::DataBlock, now: DateTime<Utc>) -> String {
+    let elapsed = now.signed_duration_since(block.start);
+    let remaining = block.end.signed_duration_since(now);
+    
+    let elapsed_str = format_duration(elapsed);
+    let remaining_str = if remaining.num_seconds() > 0 {
+        format!(" | ⏰ {} left", format_duration(remaining))
+    } else {
+        " | ⏰ Expired".to_string()
+    };
+    
+    format!("⏱️ {}{}", elapsed_str, remaining_str)
+}
+
+fn format_token_info(block: &crate::analyze::DataBlock) -> String {
+    let tokens = block.stats.total_tokens;
+    let messages = block.stats.assistant_messages + block.stats.user_messages;
+    
+    format!("{} tokens | 💬 {}", format_number(tokens), messages)
+}
+
+fn format_duration(duration: chrono::Duration) -> String {
+    let hours = duration.num_hours();
+    let minutes = duration.num_minutes() - hours * 60;
+    
+    if hours > 0 {
+        format!("{}h{:02}m", hours, minutes)
+    } else {
+        format!("{}m", minutes)
+    }
+}
+
+fn format_number(num: i64) -> String {
+    if num >= 1_000_000 {
+        format!("{:.1}M", num as f64 / 1_000_000.0)
+    } else if num >= 1_000 {
+        format!("{:.1}K", num as f64 / 1_000.0)
+    } else {
+        format!("{}", num)
+    }
+}
