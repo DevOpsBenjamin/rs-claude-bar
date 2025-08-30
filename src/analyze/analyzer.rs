@@ -29,4 +29,16 @@ impl Analyzer {
         v.reverse();
         v
     }
+
+    /// Find the current active block at the given timestamp
+    pub fn find_current_block(&self, now: DateTime<Utc>) -> Option<&DataBlock> {
+        self.data_blocks
+            .values()
+            .find(|block| now >= block.start && now < block.end)
+    }
+
+    /// Get all blocks (for debug purposes)
+    pub fn all_blocks(&self) -> Vec<&DataBlock> {
+        self.data_blocks.values().collect()
+    }
 }

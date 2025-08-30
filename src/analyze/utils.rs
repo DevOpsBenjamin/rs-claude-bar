@@ -103,14 +103,14 @@ fn group_consecutive_gaps(result: &mut HashMap<DateTime<Utc>, DataBlock>) {
 
        let first_key = group[0];
 
-        let mut merged_block = result.get(&first_key).unwrap().clone(); // Clone au lieu de get_mut
+        let mut merged_block = result.get(&first_key).unwrap().clone(); // Clone instead of get_mut
 
         for &key in &group[1..] {
             let block_to_merge = result.remove(&key).unwrap();
             merge_data_blocks(&mut merged_block, &block_to_merge);
         }
         
-        // Réinsérer le bloc fusionné
+        // Reinsert the merged block
         result.insert(first_key, merged_block);
    }
 }
@@ -133,22 +133,22 @@ fn group_consecutive_datetimes(datetimes: Vec<DateTime<Utc>>) -> Vec<Vec<DateTim
         let current = datetimes[i];
         let previous = current_group.last().unwrap();
         
-        // Vérifier si l'écart est <= 1 heure et si le groupe n'est pas plein
+        // Check if gap is <= 1 hour and group not full
         let time_diff = current.signed_duration_since(*previous);
         let is_consecutive = time_diff <= Duration::hours(1) && time_diff >= Duration::zero();
         let group_not_full = current_group.len() < 5;
         
         if is_consecutive && group_not_full {
-            // Ajouter au groupe actuel
+            // Add to current group
             current_group.push(current);
         } else {
-            // Finaliser le groupe actuel et en commencer un nouveau
+            // Finalize current group and start a new one
             groups.push(current_group);
             current_group = vec![current];
         }
     }
     
-    // Ajouter le dernier groupe
+    // Add the last group
     if !current_group.is_empty() {
         groups.push(current_group);
     }
@@ -179,15 +179,27 @@ fn create_stats_from_per_hour(ph: &PerHourBlock) -> DataStats {
 }
 
 fn merge_stats(stats: &mut DataStats, to_add: &DataStats) {
-    stats.input_tokens += to_add.input_tokens as i64;
-    stats.output_tokens += to_add.output_tokens as i64;
-    stats.cache_creation_tokens += to_add.cache_creation_tokens as i64;
-    stats.cache_read_tokens += to_add.cache_read_tokens as i64;
+    stats.input_tokens += to_add.input_tokens;
+    stats.output_tokens += to_add.output_tokens;
+    stats.cache_creation_tokens += to_add.cache_creation_tokens;
+    stats.cache_read_tokens += to_add.cache_read_tokens;
     stats.total_tokens += to_add.total_tokens;
-    stats.assistant_messages += to_add.assistant_messages as i64;
-    stats.user_messages += to_add.user_messages as i64;
-    stats.total_content_length += to_add.total_content_length as i64;
-    stats.entry_count += to_add.entry_count as i64;
+    stats.assistant_messages += to_add.assistant_messages;
+    stats.user_messages += to_add.user_messages;
+    stats.total_content_length += to_add.total_content_length;
+    stats.entry_count += to_add.entry_count;
+}
+
+fn merge_per_hour_into_stats(stats: &mut DataStats, ph: &PerHourBlock) {
+    stats.input_tokens += ph.input_tokens as i64;
+    stats.output_tokens += ph.output_tokens as i64;
+    stats.cache_creation_tokens += ph.cache_creation_tokens as i64;
+    stats.cache_read_tokens += ph.cache_read_tokens as i64;
+    stats.total_tokens += calculate_total_tokens(ph);
+    stats.assistant_messages += ph.assistant_messages as i64;
+    stats.user_messages += ph.user_messages as i64;
+    stats.total_content_length += ph.total_content_length as i64;
+    stats.entry_count += ph.entry_count as i64;
 }
 
 // Create a limit block from per-hour data
@@ -204,8 +216,7 @@ fn create_limit_block(
     let mut current = start;
     while current < end {
         if let Some(ph) = per_hour.get(&current) {
-            let current_stats = create_stats_from_per_hour(ph);
-            merge_stats(&mut stats, &current_stats);
+            merge_per_hour_into_stats(&mut stats, ph);
             // Always true on first
             if ph.min_timestamp < min_timestamp { min_timestamp = ph.min_timestamp; }
             // Always true on first
