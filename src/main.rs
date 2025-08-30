@@ -41,7 +41,7 @@ fn main() {
         Commands::Prompt => commands::prompt::run(&config),
         Commands::Display => commands::display::run(&config),
         Commands::Config { command } => commands::config::run(command, &config),
-        Commands::Blocks => commands::blocks::run(&config),
+        Commands::Blocks => commands::blocks::run(&config, &analyzer),
 
         //Helper for debuging some part of code no use for real app
         Commands::Debug { limits } => commands::debug::run(&config, &mut cache_manager, limits),

@@ -1,115 +1,38 @@
-
-use std::path::Path;
-use chrono::{DateTime, Duration, Utc};
-
 use crate::{
-    analyzer::{
-        parse_reset_time, 
-        calculate_unlock_time,
-        load_entries_with_cache
-    },
-    utils::formatting::{
-        format_date,
-        format_duration,
-        format_token_count
-    },
+    analyze::Analyzer,
     display::table::TableCreator,
-    commands::shared_types::UsageBlock,
     claudebar_types::{
-        usage_entry::{ClaudeBarUsageEntry, UserRole},
         config::ConfigInfo,
-        display::{
-            HeaderInfo,
-        }
+        display::HeaderInfo,
     },
     common::colors::*,
 };
 
-pub fn run(config: &ConfigInfo) {
-    let mut updated_config = config.clone();
-    let base_path = format!("{}/projects", config.claude_data_path);
-    let path = Path::new(&base_path);
-
-    if !path.exists() {
-        eprintln!("Path does not exist: {}", base_path);
-        return;
-    }
-
+/// Minimal `blocks` implementation: use Analyzer’s limit blocks and display last 10.
+pub fn run(_config: &ConfigInfo, analyzer: &Analyzer) {
     println!(
-        "{bold}{cyan}📊 5-Hour Usage Blocks Analysis{reset}",
-        bold = { BOLD },
-        cyan = { CYAN },
-        reset = { RESET },
+        "{bold}{cyan}📊 5-Hour Usage Blocks (limits){reset}",
+        bold = { BOLD }, cyan = { CYAN }, reset = { RESET }
     );
-    println!();
 
-    // Load ALL entries with caching (blocks analysis needs historical data)
-    let (mut all_entries, load_duration) = load_entries_with_cache(&base_path);
-    
-    if all_entries.is_empty() {
-        println!("❌ No usage entries found in {}!", base_path);
-        return;
-    }
+    // Get all limit blocks, sorted desc by unlock; take the 10 most recent
+    let blocks = analyzer.limit_blocks_all();
+    let top10 = blocks.into_iter().take(10).collect::<Vec<_>>();
 
-    // Sort by timestamp (descending for analysis)
-    all_entries.sort_by(|a, b| b.timestamp.cmp(&a.timestamp));
-
-    println!(
-        "📈 Loaded {} entries from {} to {} (took {:.1}ms)",
-        all_entries.len(),
-        all_entries
-            .last()
-            .unwrap()
-            .timestamp
-            .format("%Y-%m-%d %H:%M UTC"),
-        all_entries
-            .first()
-            .unwrap()
-            .timestamp
-            .format("%Y-%m-%d %H:%M UTC"),
-        load_duration.as_secs_f64() * 1000.0
-    );
-    println!();
-
-    // Find usage blocks
-    let analysis_start = std::time::Instant::now();
-    let mut blocks = analyze_usage_blocks(&all_entries);
-    let analysis_duration = analysis_start.elapsed();
-    
-    // Sort blocks by start time descending (most recent first)
-    blocks.sort_by(|a, b| b.start_time.cmp(&a.start_time));
-
-
-    // Get last 10 fixed blocks (limit reached, not guessed)
-    let fixed_blocks: Vec<&UsageBlock> = blocks.iter()
-        .filter(|b| b.limit_reached && !b.guessed)
-        .collect();
-    // Get current ongoing block (not limit reached, no end time)
-    let current_block = blocks.iter()
-        .find(|b| !b.limit_reached && b.end_time.is_none());
-
-    println!("🔍 Found {} fixed blocks, showing last 10 + current (analysis took {:.1}ms):", 
-            fixed_blocks.len(), 
-            analysis_duration.as_secs_f64() * 1000.0);
-    println!();
-    
-    //Table using Helper
+    // Table: Start | End (most recent first)
     let headers = vec![
-        HeaderInfo::new("Type", 6),
-        HeaderInfo::new("Start", 13),
-        HeaderInfo::new("End", 13),
-        HeaderInfo::new("Duration", 10),
-        HeaderInfo::new("Tokens", 9),
-        HeaderInfo::new("Messages", 12),
-        HeaderInfo::new("Status", 9),
+        HeaderInfo::new("Start", 19),
+        HeaderInfo::new("End", 19),
+        
+        //HeaderInfo::new("Duration", 10),
+        //HeaderInfo::new("Tokens", 9),
+        //HeaderInfo::new("Messages", 12),
+        //HeaderInfo::new("Status", 9),
     ];
     let mut tc = TableCreator::new(headers);
-
-    // Fixed blocks
-    let mut display_blocks: Vec<&UsageBlock> = fixed_blocks.iter().take(10).copied().collect();
-    display_blocks.reverse();
-    
-    for block in display_blocks.iter() {
+    for (start, lb) in top10 {
+        /*
+        
         let end_time = block
             .end_time
             .unwrap_or_else(Utc::now);
@@ -135,8 +58,15 @@ pub fn run(config: &ConfigInfo) {
             status
         ]);
     }
+     */
+        tc.add_row(vec![
+            format!("{}", start.format("%Y-%m-%d %H:%M UTC")),
+            format!("{}", lb.unlock_timestamp.format("%Y-%m-%d %H:%M UTC")),
+        ]);
+    }
     tc.display(false);
 
+    /*
     // Show current session estimate first
     if let Some(current) = current_block {
         let total_tokens: u32 = current.entries.iter()
@@ -172,155 +102,11 @@ pub fn run(config: &ConfigInfo) {
             { &status }
         );
     }
-    
-    // Update config with the latest block date for next run
-    // This needs to be implemented differently as we're not using CurrentBlock here
-    // For now, we'll find the latest non-projected block from our analysis
-    if let Some(latest_real_block) = blocks.iter()
-        .filter(|b| !b.guessed && b.limit_reached)
-        .max_by_key(|b| b.end_time.unwrap_or(Utc::now())) {
-        updated_config.last_limit_date = latest_real_block.end_time;
-        
-        // Save updated config
-        if let Err(e) = crate::config_manager::save_config(&updated_config) {
-            eprintln!("Warning: Could not save updated config: {}", e);
-        }
-    }
-}
-
-/// Print all limit messages with their timestamps and file paths
-fn print_limits_debug(all_entries: &[ClaudeBarUsageEntry]) {
-    println!(
-        "{bold}{purple}🔍 DEBUG: Limit Messages{reset}",
-        bold = { BOLD },
-        purple = { PURPLE },
-        reset = { RESET },
-    );
-    println!();
-
-    let limit_entries: Vec<&ClaudeBarUsageEntry> =
-        all_entries.iter().filter(|e| e.is_limit_reached).collect();
-
-    if limit_entries.is_empty() {
-        println!("❌ No limit messages found");
-        return;
-    }
-
-    for entry in &limit_entries {
-        let path = format!("{}/{}", entry.file_info.folder_name, entry.file_info.file_name);
-
-        println!(
-            "{} | {}",
-            entry.timestamp.format("%Y-%m-%d %H:%M UTC"),
-            path
-        );
-        if let Some(text) = &entry.content_text {
-            println!("  {}", text.trim());
-        }
-    }
-
-    println!(
-        "{green}✅ Found {} limit messages{reset}",
-        limit_entries.len(),
-        green = { GREEN },
-        reset = { RESET },
-    );
+    */
 }
 
 
-/// Get content text from a ClaudeBarUsageEntry
-fn get_entry_content_text(entry: &ClaudeBarUsageEntry) -> String {
-    entry.content_text.clone().unwrap_or_default()
-}
-
-/// Calculate FIXED 5-hour window from reset time
-/// Reset time (e.g., "5pm") defines the END of the 5-hour window
-/// So "reset 5pm" means window was 12pm-5pm (12:00-17:00)
-fn calculate_fixed_window_from_reset(limit_timestamp: DateTime<Utc>, reset_time: &str) -> (DateTime<Utc>, DateTime<Utc>) {
-    // Parse reset time to get the hour
-    let reset_hour = match reset_time.to_lowercase().as_str() {
-        "12am" | "midnight" => 0,
-        "1am" => 1, "2am" => 2, "3am" => 3, "4am" => 4, "5am" => 5,
-        "6am" => 6, "7am" => 7, "8am" => 8, "9am" => 9, "10am" => 10, "11am" => 11,
-        "12pm" | "noon" => 12,
-        "1pm" => 13, "2pm" => 14, "3pm" => 15, "4pm" => 16, "5pm" => 17,
-        "6pm" => 18, "7pm" => 19, "8pm" => 20, "9pm" => 21, "10pm" => 22, "11pm" => 23,
-        _ => {
-            // Try to extract number + am/pm pattern
-            if let Some(hour_str) = reset_time.chars().take_while(|c| c.is_ascii_digit()).collect::<String>().parse::<u32>().ok() {
-                if reset_time.to_lowercase().contains("pm") && hour_str != 12 {
-                    (hour_str + 12) % 24
-                } else if reset_time.to_lowercase().contains("am") && hour_str == 12 {
-                    0
-                } else {
-                    hour_str % 24
-                }
-            } else {
-                17 // Default to 5pm
-            }
-        }
-    };
-
-    // The key insight: when we hit a limit and get "reset 5pm", 
-    // it means the window that JUST ENDED was ending at 5pm
-    // So we want the window that ended at the most recent reset_hour that's <= limit_timestamp
-    
-    let limit_date = limit_timestamp.date_naive();
-    
-    // Try reset time on the same day first
-    let same_day_reset = limit_date.and_hms_opt(reset_hour as u32, 0, 0)
-        .unwrap_or_else(|| limit_date.and_hms_opt(17, 0, 0).unwrap())
-        .and_utc();
-    
-    let window_end = if limit_timestamp >= same_day_reset {
-        // Limit was hit on or after today's reset time, so yesterday's window ended at today's reset
-        same_day_reset - Duration::days(1)
-    } else {
-        // Limit was hit before today's reset time, so today's window is ending at today's reset
-        same_day_reset
-    };
-    
-    // Window START is 5 hours before window end
-    let window_start = window_end - Duration::hours(5);
-    
-    (window_start, window_end)
-}
-
-/// Group entries into sessions based on gaps > 1 hour
-fn group_entries_into_sessions(entries: &[ClaudeBarUsageEntry]) -> Vec<Vec<ClaudeBarUsageEntry>> {
-    if entries.is_empty() {
-        return Vec::new();
-    }
-    
-    let mut sessions = Vec::new();
-    let mut current_session = Vec::new();
-    let mut last_timestamp: Option<DateTime<Utc>> = None;
-    
-    for entry in entries {
-        if let Some(last) = last_timestamp {
-            let gap = entry.timestamp - last;
-            
-            // If gap > 1 hour, start new session
-            if gap > Duration::hours(1) {
-                if !current_session.is_empty() {
-                    sessions.push(current_session.clone());
-                    current_session.clear();
-                }
-            }
-        }
-        
-        current_session.push(entry.clone());
-        last_timestamp = Some(entry.timestamp);
-    }
-    
-    // Add final session
-    if !current_session.is_empty() {
-        sessions.push(current_session);
-    }
-    
-    sessions
-}
-
+/*
 /// Print debug information for FIXED blocks (assured time gaps with limits)
 fn print_blocks_debug(blocks: &[UsageBlock], all_entries: &[ClaudeBarUsageEntry]) {    
     println!("{bold}{cyan}🔍 DEBUG: FIXED 5-Hour Windows Analysis{reset}",
@@ -463,4 +249,5 @@ fn print_gaps_debug(blocks: &[UsageBlock]) {
         yellow = { YELLOW },
         reset = { RESET },
     );
-}
+} 
+*/
