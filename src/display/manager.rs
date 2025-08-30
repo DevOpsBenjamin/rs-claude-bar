@@ -1,4 +1,6 @@
 use chrono::{DateTime, Utc, Duration};
+
+    /*
 use crate::{
     analyzer::BlockStatus,
     display::
@@ -110,7 +112,6 @@ impl DisplayManager {
         }
     }
     
-    /*
     /// Create DisplayData from StatsFile
     pub fn create_display_data(stats: &StatsFile) -> DisplayData {
         Self::create_display_data_with_model(stats, None)
@@ -151,7 +152,6 @@ impl DisplayManager {
             block_status: BlockStatus::NeedNewBlock
         }
     }
-     */
     /// Create default display configuration
     pub fn default_config() -> Vec<DisplayItem> {
         vec![
@@ -169,3 +169,4 @@ impl Default for DisplayManager {
         Self::new(Self::default_config())
     }
 }
+     */

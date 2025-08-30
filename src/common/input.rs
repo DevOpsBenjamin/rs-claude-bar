@@ -1,10 +1,6 @@
 use crate::claude_types::input::ClaudeCodeInput;
 use std::io::{self, Read};
 
-pub fn generate_claude_status() -> Result<String, Box<dyn std::error::Error>> {
-    crate::status::generate_status()
-}
-
 pub fn parse_claude_input() -> Option<ClaudeCodeInput> {
     if !atty::is(atty::Stream::Stdin) {
         let mut input = String::new();
