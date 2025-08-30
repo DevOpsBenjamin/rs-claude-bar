@@ -1,0 +1,36 @@
+{
+  "version": "1.0.0",
+  "claude_data_path": "./.claude",
+  "display": {
+    "use_colors": true,
+    "items": [
+      {
+        "stat_type": "TokenUsage",
+        "format": "TextWithEmoji",
+        "enabled": true
+      },
+      {
+        "stat_type": "BlockStatus",
+        "format": "StatusIcon",
+        "enabled": true
+      },
+      {
+        "stat_type": "MessageCount",
+        "format": "TextWithEmoji",
+        "enabled": true
+      },
+      {
+        "stat_type": "TimeRemaining",
+        "format": "TextWithEmoji",
+        "enabled": true
+      },
+      {
+        "stat_type": "Model",
+        "format": "TextWithEmoji",
+        "enabled": true
+      }
+    ],
+    "separator": " | "
+  },
+  "last_limit_date": null
+}

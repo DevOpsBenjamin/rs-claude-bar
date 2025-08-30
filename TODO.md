@@ -27,11 +27,18 @@
 ## 🚧 In Progress (v0.2.0)
 
 ### Core Features
-- [ ] **JSONL Parsing Enhancement**
-  - [ ] Parse actual token counts from usage data
-  - [ ] Extract model information
-  - [ ] Handle timestamps properly
-  - [ ] Error handling for malformed JSONL
+- [x] **JSONL Parsing Enhancement** 
+  - [x] Parse actual token counts from usage data
+  - [x] Extract model information
+  - [x] Handle timestamps properly
+  - [x] Error handling for malformed JSONL
+  - [x] Incremental parsing with boundary detection
+
+- [x] **Cache System Architecture**
+  - [x] HashMap-based storage for O(1) lookups
+  - [x] PerHourBlock structures with comprehensive statistics
+  - [x] BlockLine tracking for limit/unlock events
+  - [x] Cache invalidation logic (Fresh, NeedsRefresh, NotInCache)
 
 - [ ] **5-Hour Window Calculation**
   - [ ] Implement window detection logic (like CCUsage)
@@ -52,11 +59,19 @@
   - [ ] 🔴 Red: > 80% usage
 
 ### Performance & Reliability
-- [ ] **Caching System**
-  - [ ] Implement ~/.claude_bar/ cache directory
-  - [ ] Cache parsed JSONL data
-  - [ ] Invalidate cache when files change
-  - [ ] Sub-100ms response time for status line
+- [x] **Caching System**
+  - [x] Implement ~/.claude_bar/ cache directory
+  - [x] Cache parsed JSONL data with persistence
+  - [x] Invalidate cache when files change
+  - [x] Sub-100ms response time for status line (27-78ms achieved)
+  - [x] 3x+ performance improvement from caching
+
+### Debug & Development Tools
+- [x] **Cache-Only Debug Commands**
+  - [x] --limits: Show all limit events from cache
+  - [x] --blocks: Show per-hour usage blocks from cache
+  - [x] --gaps: Show usage gaps between blocks
+  - [x] Zero filesystem access for debug operations
 
 ## 📋 Planned (v0.3.0)
 

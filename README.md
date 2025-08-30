@@ -4,6 +4,8 @@ Enhanced Claude Code usage tracker with 5-hour window monitoring, written in Rus
 
 A fast, lightweight alternative to CCUsage for tracking Claude Code token usage, session windows, and providing real-time status information in your Claude Code status bar.
 
+Run `rs-claude-bar` with no arguments to view available commands.
+Use `rs-claude-bar install` to configure Claude settings automaticly it use `rs-claude-bar prompt` to display the status line.
 ## Features
 
 - 🚀 **Fast**: Written in Rust, optimized for performance
@@ -36,11 +38,18 @@ Update your Claude Code settings (`~/.claude/settings.json`):
 {
   "statusLine": {
     "type": "command",
-    "command": "rs-claude-bar",
+    "command": "rs-claude-bar prompt",
     "padding": 0
   }
 }
 ```
+
+Or run the built-in installer:
+
+```bash
+rs-claude-bar install
+```
+
 
 ## Output Format
 
@@ -66,15 +75,16 @@ Update your Claude Code settings (`~/.claude/settings.json`):
 # Clone the repository
 git clone https://github.com/your-username/rs-claude-bar
 cd rs-claude-bar
+# Install nextest for better test output:
+cargo install cargo-nextest
 
 # Build
 cargo build --release
-
 # Install locally
-cargo install --path .
+cargo install --path
 
 # Run tests
-cargo test
+cargo nextest run
 ```
 
 ## How It Works
