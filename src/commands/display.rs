@@ -244,24 +244,40 @@ fn format_name(format: &crate::display::status_config::DisplayFormat) -> &'stati
     }
 }
 
-fn confirm(prompt: &str) -> Result<bool, Box<dyn std::error::Error>> {
-    print!("{}", prompt);
-    io::stdout().flush()?;
-    
-    let mut input = String::new();
-    io::stdin().read_line(&mut input)?;
-    let input = input.trim().to_lowercase();
-    
-    Ok(matches!(input.as_str(), "" | "y" | "yes"))
-}
 
 fn load_or_default_status_config(_config: &ConfigInfo) -> Result<StatusLineConfig, Box<dyn std::error::Error>> {
-    // TODO: Load from ~/.claude-bar/status_config.json
-    Ok(StatusLineConfig::default())
+    use std::fs;
+    
+    let home = dirs::home_dir().unwrap_or_else(|| std::path::PathBuf::from("."));
+    let config_file = home.join(".claude-bar").join("status_config.json");
+    
+    // Try to load existing config
+    if config_file.exists() {
+        let json = fs::read_to_string(&config_file)?;
+        let status_config: StatusLineConfig = serde_json::from_str(&json)?;
+        Ok(status_config)
+    } else {
+        // Return default config if file doesn't exist
+        Ok(StatusLineConfig::default())
+    }
 }
 
-fn save_status_config(_config: &ConfigInfo, _status_config: &StatusLineConfig) -> Result<(), Box<dyn std::error::Error>> {
-    // TODO: Save to ~/.claude-bar/status_config.json
+fn save_status_config(_config: &ConfigInfo, status_config: &StatusLineConfig) -> Result<(), Box<dyn std::error::Error>> {
+    use std::fs;
+    use serde_json;
+    
+    // Save to ~/.claude-bar/status_config.json
+    let home = dirs::home_dir().unwrap_or_else(|| std::path::PathBuf::from("."));
+    let config_dir = home.join(".claude-bar");
+    let config_file = config_dir.join("status_config.json");
+    
+    // Ensure directory exists
+    fs::create_dir_all(&config_dir)?;
+    
+    // Save the status config
+    let json = serde_json::to_string_pretty(&status_config)?;
+    fs::write(&config_file, json)?;
+    
     Ok(())
 }
 
