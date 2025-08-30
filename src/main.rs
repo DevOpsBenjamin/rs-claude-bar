@@ -2,7 +2,7 @@ use clap::Parser;
 use std::time::Instant;
 use std::fs;
 use std::path::PathBuf;
-use chrono::{DateTime, Utc};
+use chrono::Utc;
 
 use rs_claude_bar::config_manager::initialize_config;
 use rs_claude_bar::cache::CacheManager;
@@ -11,7 +11,7 @@ use rs_claude_bar::cli::{Cli, Commands};
 use rs_claude_bar::commands;
 
 fn main() {
-    let start = std::time::Instant::now();
+    let start = Instant::now();
     // Initialize configuration (creates folder and file if needed)
     let config = initialize_config();    
     let config_duration = start.elapsed();
@@ -19,20 +19,20 @@ fn main() {
     // Parse CLI first to get global flags
     let cli = Cli::parse();
     
-    let cache = std::time::Instant::now();
+    let cache = Instant::now();
     // Load cache (will automatically scan projects subdirectory)
     let mut cache_manager = CacheManager::new(&config.claude_data_path, cli.no_cache);
     let cache_duration = cache.elapsed();
 
-    let file = std::time::Instant::now();
+    let file = Instant::now();
     cache_manager.refresh_cache();
     let file_duration = file.elapsed();
 
-    let analyze =  std::time::Instant::now();
-    let mut analyzer = Analyzer::new(cache_manager.get_cache());
+    let analyze =  Instant::now();
+    let analyzer = Analyzer::new(cache_manager.get_cache());
     let analyze_duration = analyze.elapsed();
 
-    let exec = std::time::Instant::now();
+    let exec = Instant::now();
     // Execute the command  
     match cli.command.unwrap_or(Commands::Info) {
         Commands::Info => commands::info::run(&config),
@@ -49,7 +49,7 @@ fn main() {
     let exec_duration = exec.elapsed();
 
     // Save cache to disk with timing (unless --no-save)
-    let save = std::time::Instant::now();
+    let save = Instant::now();
     if !cli.no_save {
         cache_manager.save();
     }

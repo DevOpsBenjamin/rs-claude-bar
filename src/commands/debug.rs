@@ -6,7 +6,7 @@ use crate::{
         display::HeaderInfo,
     },
     display::table::TableCreator,
-    utils::formatting::{
+    formatting::{
         format_date,
         format_text,
     }

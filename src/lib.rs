@@ -7,7 +7,7 @@ pub mod cache;
 pub mod config_manager;
 pub mod display;
 pub mod status;
-pub mod utils;
+pub mod formatting;
 pub mod cli;
 pub mod commands;
 pub mod common;
