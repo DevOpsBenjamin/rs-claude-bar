@@ -1,4 +1,4 @@
-use crate::{common::colors::{BOLD, GREEN, RED, RESET}, config::{DisplayFormat, StatType}, display::prompt::PromptData};
+use crate::{common::colors::{BOLD, GREEN, RED, RESET, YELLOW}, config::{DisplayFormat, StatType}, display::prompt::PromptData};
 
 
 /// Generate a realistic example using data data
@@ -36,9 +36,11 @@ fn generate_token_with_format(data: &PromptData, display: &DisplayFormat) -> Str
     match display {
         DisplayFormat::TextWithEmoji => format!("🧠 {}", format_number(data.tokens_used)),
         DisplayFormat::Compact => format_number_compact(data.tokens_used),
-        DisplayFormat::Ratio => format!("{}/{}", 
+        DisplayFormat::Ratio => format!("{bold}{}/{}{reset}", 
             format_number_compact(data.tokens_used), 
-            format_number_compact(data.tokens_limit)),
+            format_number_compact(data.tokens_limit),
+            reset = {RESET},
+            bold = {BOLD}),
         _ => format!("{} tokens", format_number(data.tokens_used)),
     }
 }
@@ -49,10 +51,19 @@ fn generate_progress_with_format(data: &PromptData, display: &DisplayFormat) -> 
         DisplayFormat::ProgressBar => {
             let filled = (data.progress_percent / 10.0) as usize;
             let empty = 10 - filled;
-            format!("[{}{}] {:.1}%", 
+            let color = match data.progress_percent {
+                0.0..=49.0  => GREEN,
+                50.0..=79.0  => YELLOW,
+                _ => RED
+            };
+            format!("{color}[{}{}] {bold}{:.1}{reset}%",
                 "█".repeat(filled), 
                 "░".repeat(empty), 
-                data.progress_percent)
+                data.progress_percent,
+                color = {color}, 
+                reset = {RESET},
+                bold = {BOLD}
+            )
         },
         DisplayFormat::StatusColored => {
             if data.progress_percent < 50.0 { "🟢 Good" }
