@@ -6,6 +6,7 @@ use chrono::{DateTime, Utc};
 
 use rs_claude_bar::config_manager::initialize_config;
 use rs_claude_bar::cache::CacheManager;
+use rs_claude_bar::analyze::Analyzer;
 use rs_claude_bar::cli::{Cli, Commands};
 use rs_claude_bar::commands;
 
