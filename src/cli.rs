@@ -34,7 +34,23 @@ pub enum Commands {
         command: Option<ConfigCommands>,
     },
     /// Display last 5-hour usage blocks
-    Blocks,
+    Blocks{        
+        #[command(subcommand)]
+        command: Option<BlocksCommands>,
+    },
+}
+
+#[derive(Subcommand, Clone)]
+pub enum BlocksCommands {
+    /// Configure Claude data path
+    #[command(name = "all")]
+    All,
+    /// Configure Claude data path
+    #[command(name = "limits")]
+    Limits,
+    /// Configure Claude data path
+    #[command(name = "gaps")]
+    Gap,  
 }
 
 #[derive(Subcommand, Clone)]

@@ -2,8 +2,8 @@ use std::{collections::HashMap, fs, path::PathBuf};
 use chrono::{DateTime, Utc, Timelike};
 
 use crate::{
-    cache::{CachedFile, BlockLine, PerHourBlock},
-    claude_types::transcript_entry::ClaudeEntry,
+    cache::{BlockLine, CachedFile, PerHourBlock},
+    claude_types::transcript_entry::ClaudeEntry, common::duration::round_to_hour_boundary,
 };
 
 /// Refresh a single file by parsing JSONL content and populating cache data
@@ -202,16 +202,6 @@ fn generate_block_lines(entries: &[ClaudeEntry]) -> HashMap<DateTime<Utc>, Block
         }
     }
     block_lines
-}
-
-/// Round timestamp down to hour boundary (14:32:15 -> 14:00:00)
-fn round_to_hour_boundary(dt: DateTime<Utc>) -> DateTime<Utc> {
-    dt.with_minute(0)
-        .unwrap()
-        .with_second(0)
-        .unwrap()
-        .with_nanosecond(0)
-        .unwrap()
 }
 
 /// Extract reset time from limit message (e.g., "5-hour limit reached ∙ resets 5pm" -> "5pm")

@@ -18,15 +18,13 @@ impl Analyzer {
     }
 
     /// Return all limit-typed DataBlocks, sorted by end/unlock desc (most recent first)
-    pub fn limit_blocks_typed_all(&self) -> Vec<DataBlock> {
+    pub fn blocks_typed_all(&self) -> Vec<DataBlock> {
         let mut v: Vec<DataBlock> = self
             .data_blocks
             .values()
-            .filter(|b| matches!(b.kind, BlockKind::Limit))
             .cloned()
             .collect();
         v.sort_by_key(|b| b.end);
-        v.reverse();
         v
     }
 

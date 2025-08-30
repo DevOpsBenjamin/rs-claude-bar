@@ -1,4 +1,4 @@
-mod cache;
+mod status;
 mod number;
 mod token;
 mod file;
@@ -11,5 +11,5 @@ pub use duration::*;
 pub use file::*;
 pub use token::*;
 pub use number::*;
-pub use cache::*;
+pub use status::*;
 pub use text::*;

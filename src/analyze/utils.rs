@@ -2,8 +2,8 @@ use chrono::{DateTime, Utc, Duration};
 use std::collections::{hash_map::Entry, HashMap, HashSet};
 
 use crate::{
-    analyze::{DataBlock, DataStats, BlockKind, LimitBlock},
-    cache::{CacheInfo, PerHourBlock}
+    analyze::{BlockKind, DataBlock, DataStats, LimitBlock},
+    cache::{CacheInfo, PerHourBlock}, common::duration::round_to_hour_boundary
 };
 
 // STEP 1: Find FIXED 5-hour windows from limit messages
@@ -81,6 +81,9 @@ pub fn analyze_blocks(cache: &CacheInfo) -> HashMap<DateTime<Utc>, DataBlock> {
       }
 
       group_consecutive_gaps(&mut result);
+      
+      // 3) Add current block to ensure one always exists
+      add_current_block(&mut result);
 
       result
 }
@@ -255,5 +258,40 @@ fn create_gap_block(
         min_timestamp: ph.min_timestamp,
         max_timestamp: ph.max_timestamp,
         stats: create_stats_from_per_hour(ph),
+    }
+}
+
+/// Add a current block to ensure get_current() doesn't panic
+fn add_current_block(result: &mut HashMap<DateTime<Utc>, DataBlock>) {
+    let now = Utc::now();
+    
+    // Check if current time falls within any existing block's range (start <= now < end)
+    let mut found_block_key = None;
+    for (key, block) in result.iter() {
+        if block.start <= now && now < block.end {
+            found_block_key = Some(*key);
+            break;
+        }
+    }
+    
+    if let Some(key) = found_block_key {
+        // Convert existing block to Current type
+        if let Some(existing_block) = result.get_mut(&key) {
+            existing_block.kind = BlockKind::Current;
+        }
+    } else {
+        // No block contains current time, create a new Current block
+        let current_hour = round_to_hour_boundary(now);
+        let current_block = DataBlock {
+            kind: BlockKind::Current,
+            start: current_hour,
+            end: current_hour + Duration::hours(1),
+            unlock_timestamp: None,
+            min_timestamp: now,
+            max_timestamp: now,
+            stats: DataStats::default(),
+        };
+        
+        result.insert(current_hour, current_block);
     }
 }

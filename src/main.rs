@@ -44,7 +44,7 @@ fn main() {
         Commands::Help { command } => commands::help::run(command),
         Commands::Prompt => commands::prompt::run(&config, &prompt_data),
         Commands::Config { command } => commands::config::run(command, &mut config_manager, &prompt_data),
-        Commands::Blocks => commands::blocks::run(&analyzer),
+        Commands::Blocks { command } => commands::blocks::run(command, &analyzer),
     }    
     let exec_duration = exec.elapsed();
 
