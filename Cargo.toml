@@ -1,12 +1,17 @@
 [package]
 name = "rs-claude-bar"
-version = "0.1.0"
+version = "0.1.0-alpha.1"
 edition = "2021"
-description = "Enhanced Claude Code usage tracker with 5-hour window monitoring"
+authors = ["DevOpsBenjamin"]
+description = "Ultra-fast Claude Code usage tracker with 5-hour window monitoring and status line integration"
 license = "MIT"
 repository = "https://github.com/DevOpsBenjamin/rs-claude-bar"
+homepage = "https://github.com/DevOpsBenjamin/rs-claude-bar"
+documentation = "https://github.com/DevOpsBenjamin/rs-claude-bar"
+readme = "README.md"
 keywords = ["claude", "ai", "usage", "cli", "monitoring"]
 categories = ["command-line-utilities"]
+exclude = ["test_data/", "tests/"]
 
 [[bin]]
 name = "rs-claude-bar"
