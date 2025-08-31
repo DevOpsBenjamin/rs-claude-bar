@@ -28,11 +28,10 @@ impl Analyzer {
         } else {
             output_counts.sort_unstable();
             let len = output_counts.len();
-            let p20_idx = (len as f64 * 0.2) as usize;
-            let p80_idx = (len as f64 * 0.8) as usize;
+            let p70_idx = (len as f64 * 0.7) as usize;
             
-            // Remove p20 and p80 outliers, keep middle 60%
-            let trimmed = &output_counts[p20_idx..p80_idx.min(len)];
+            // Remove  p70 outliers
+            let trimmed = &output_counts[0..p70_idx.min(len)];
             
             if trimmed.is_empty() {
                 output_counts[0] // fallback if too few samples
