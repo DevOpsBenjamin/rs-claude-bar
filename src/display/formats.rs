@@ -1,3 +1,5 @@
+use std::cmp::min;
+
 use crate::{common::colors::{BOLD, GREEN, RED, RESET, YELLOW}, config::{DisplayFormat, StatType}, display::prompt::PromptData};
 
 
@@ -49,7 +51,8 @@ fn generate_progress_with_format(data: &PromptData, display: &DisplayFormat) -> 
     match display {        
         // Token Progress Examples  
         DisplayFormat::ProgressBar => {
-            let filled = (data.progress_percent / 10.0) as usize;
+            let mut filled = (data.progress_percent / 10.0) as usize;
+            filled = min(10, filled);
             let empty = 10 - filled;
             let color = match data.progress_percent {
                 0.0..=49.0  => GREEN,
